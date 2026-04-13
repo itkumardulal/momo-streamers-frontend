@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Momo Streamer — Frontend
 
-## Getting Started
+Next.js **15** (App Router) + **TypeScript** + **Tailwind CSS** + **shadcn/ui**, with **Redux Toolkit** and **RTK Query** for state and API calls.
 
-First, run the development server:
+## Requirements
+
+- [Node.js](https://nodejs.org/) 20+ (LTS recommended)
+- npm (bundled with Node)
+
+## Setup
+
+```bash
+npm install
+```
+
+## Environment
+
+Copy the example env file and adjust the API base URL if needed:
+
+```bash
+copy .env.local.example .env.local   # Windows
+# cp .env.local.example .env.local   # macOS / Linux
+```
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_API_URL` | Backend base URL (default in code: `http://localhost:5159`) |
+
+No trailing slash.
+
+## Run (development)
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The dev script binds **port 3000** (`next dev --turbopack -p 3000`). If the port is busy, stop the other process or change the port in `package.json`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- App: **http://localhost:3000**
+- Ensure the **API** is running and CORS allows your origin (Development allows all localhost ports).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Production build
 
-## Learn More
+```bash
+npm run build
+npm start
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Project structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Path | Purpose |
+|------|---------|
+| `src/app` | Routes: `/login`, `/dashboard`, `/outlets`, `/users` |
+| `src/features` | Redux slices (`auth`), RTK Query (`api`) |
+| `src/entities` | Shared TypeScript types |
+| `src/shared` | Layout shell, protected route wrapper |
+| `src/components/ui` | shadcn components |
+| `src/store` | Redux store and providers |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Authentication
 
-## Deploy on Vercel
+- **No public registration.** Users are created by a Super Admin via the API.
+- JWT is stored in **`localStorage`** (MVP). RTK Query attaches `Authorization: Bearer <token>` automatically.
+- **Sign out** is available from the sidebar, the header button, and the account dropdown (clears token, resets API cache, redirects to `/login`).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Styling
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Corporate **white & blue** theme (`#2563EB` primary). Components use Tailwind + shadcn design tokens in `src/app/globals.css`.
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Development server (Turbopack, port 3000) |
+| `npm run build` | Production build |
+| `npm start` | Serve production build |
+| `npm run lint` | ESLint |
+
+---
+
+Point this app at a running **Momo Streamer API** backend. See `../momo-streamer-backend/README.md` for API setup.
