@@ -32,12 +32,17 @@ import {
   useUpdateExpenseItemMutation,
 } from "@/features/api/apiSlice";
 import type { ExpenseItem } from "@/entities/types";
+import {
+  MONTHLY_SHEET_CATEGORY_OPTIONS,
+  MonthlySheetExpenseCategory,
+} from "@/entities/types";
 import { cn } from "@/lib/utils";
 import { RowEditDeleteActions } from "@/components/row-edit-delete-actions";
 
 const itemFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   description: z.string().max(500, "Max 500 characters").optional(),
+  monthlySheetExpenseCategory: z.nativeEnum(MonthlySheetExpenseCategory),
 });
 
 type ItemForm = z.infer<typeof itemFormSchema>;
@@ -71,12 +76,20 @@ export default function ExpenseItemsPage() {
 
   const form = useForm<ItemForm>({
     resolver: zodResolver(itemFormSchema),
-    defaultValues: { name: "", description: "" },
+    defaultValues: {
+      name: "",
+      description: "",
+      monthlySheetExpenseCategory: MonthlySheetExpenseCategory.None,
+    },
   });
 
   const editForm = useForm<ItemForm>({
     resolver: zodResolver(itemFormSchema),
-    defaultValues: { name: "", description: "" },
+    defaultValues: {
+      name: "",
+      description: "",
+      monthlySheetExpenseCategory: MonthlySheetExpenseCategory.None,
+    },
   });
 
   useEffect(() => {
@@ -84,6 +97,8 @@ export default function ExpenseItemsPage() {
     editForm.reset({
       name: editing.name,
       description: editing.description ?? "",
+      monthlySheetExpenseCategory:
+        editing.monthlySheetExpenseCategory ?? MonthlySheetExpenseCategory.None,
     });
   }, [editing, editOpen, editForm]);
 
@@ -95,11 +110,16 @@ export default function ExpenseItemsPage() {
       const res = await createItem({
         name: values.name.trim(),
         description,
+        monthlySheetExpenseCategory: values.monthlySheetExpenseCategory,
       }).unwrap();
       if (res.success) {
         toast.success(res.message ?? "Item created");
         setOpen(false);
-        form.reset({ name: "", description: "" });
+        form.reset({
+          name: "",
+          description: "",
+          monthlySheetExpenseCategory: MonthlySheetExpenseCategory.None,
+        });
         return;
       }
       toast.error(res.message ?? "Could not create item");
@@ -117,6 +137,7 @@ export default function ExpenseItemsPage() {
         body: {
           name: values.name.trim(),
           description,
+          monthlySheetExpenseCategory: values.monthlySheetExpenseCategory,
         },
       }).unwrap();
       if (res.success) {
@@ -161,15 +182,21 @@ export default function ExpenseItemsPage() {
           open={open}
           onOpenChange={(v) => {
             setOpen(v);
-            if (v) form.reset({ name: "", description: "" });
+            if (v)
+              form.reset({
+                name: "",
+                description: "",
+                monthlySheetExpenseCategory: MonthlySheetExpenseCategory.None,
+              });
           }}
         >
           <DialogTrigger render={<Button type="button">Add item</Button>} />
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>New expense item</DialogTitle>
               <DialogDescription>
-                Add a unique name. Description is optional.
+                Add a unique name. Map to a monthly sheet row so daily expenses roll
+                up into the P&L report.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={onCreate} className="space-y-4">
@@ -179,6 +206,30 @@ export default function ExpenseItemsPage() {
                 {form.formState.errors.name && (
                   <p className="text-xs text-destructive">
                     {form.formState.errors.name.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ei-cat">Monthly sheet category</Label>
+                <select
+                  id="ei-cat"
+                  className={cn(
+                    "flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none",
+                    "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                  )}
+                  {...form.register("monthlySheetExpenseCategory", {
+                    valueAsNumber: true,
+                  })}
+                >
+                  {MONTHLY_SHEET_CATEGORY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                {form.formState.errors.monthlySheetExpenseCategory && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.monthlySheetExpenseCategory.message}
                   </p>
                 )}
               </div>
@@ -213,7 +264,7 @@ export default function ExpenseItemsPage() {
           if (!v) setEditing(null);
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit expense item</DialogTitle>
             <DialogDescription>{editing?.name}</DialogDescription>
@@ -223,6 +274,25 @@ export default function ExpenseItemsPage() {
               <div className="space-y-2">
                 <Label htmlFor="eei-name">Name</Label>
                 <Input id="eei-name" {...editForm.register("name")} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="eei-cat">Monthly sheet category</Label>
+                <select
+                  id="eei-cat"
+                  className={cn(
+                    "flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none",
+                    "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                  )}
+                  {...editForm.register("monthlySheetExpenseCategory", {
+                    valueAsNumber: true,
+                  })}
+                >
+                  {MONTHLY_SHEET_CATEGORY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="eei-desc">Description (optional)</Label>
@@ -260,6 +330,7 @@ export default function ExpenseItemsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Monthly sheet</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Added</TableHead>
                 <TableHead className="min-w-[148px] text-right">
@@ -270,7 +341,7 @@ export default function ExpenseItemsPage() {
             <TableBody>
               {items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-muted-foreground">
+                  <TableCell colSpan={5} className="text-muted-foreground">
                     No expense items yet. Add your first item above.
                   </TableCell>
                 </TableRow>
@@ -278,6 +349,14 @@ export default function ExpenseItemsPage() {
                 items.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell className="font-medium">{row.name}</TableCell>
+                    <TableCell className="max-w-[200px] text-sm text-muted-foreground">
+                      {MONTHLY_SHEET_CATEGORY_OPTIONS.find(
+                        (o) =>
+                          o.value ===
+                          (row.monthlySheetExpenseCategory ??
+                            MonthlySheetExpenseCategory.None),
+                      )?.label ?? "—"}
+                    </TableCell>
                     <TableCell className="max-w-[280px] truncate text-muted-foreground">
                       {row.description || "—"}
                     </TableCell>

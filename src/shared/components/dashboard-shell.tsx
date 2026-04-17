@@ -20,9 +20,11 @@ import {
   UtensilsCrossed,
   User,
   Users,
+  Wallet,
   Store,
   ShoppingBag,
   ScanLine,
+  PackageMinus,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
@@ -61,7 +63,9 @@ type NavKey =
   | "outletItems"
   | "outletPurchases"
   | "outletPos"
+  | "outletStockRemovals"
   | "expenseItems"
+  | "expenseEntries"
   | "reports";
 
 const NAV_META: Record<
@@ -111,10 +115,20 @@ const NAV_META: Record<
     icon: ShoppingBag,
   },
   outletPos: { href: "/outlet-sales", label: "Outlet POS", icon: ScanLine },
+  outletStockRemovals: {
+    href: "/outlet-stock-removals",
+    label: "Stock removals",
+    icon: PackageMinus,
+  },
   expenseItems: {
     href: "/expense-items",
     label: "Expense items",
     icon: Receipt,
+  },
+  expenseEntries: {
+    href: "/expense-entries",
+    label: "Daily expenses",
+    icon: Wallet,
   },
   reports: { href: "/reports", label: "Reports", icon: BarChart3 },
 };
@@ -136,7 +150,9 @@ const SUPER_ADMIN_NAV: NavKey[] = [
   "outletItems",
   "outletPurchases",
   "outletPos",
+  "outletStockRemovals",
   "expenseItems",
+  "expenseEntries",
   "reports",
 ];
 
@@ -147,6 +163,7 @@ const WAREHOUSE_USER_NAV: NavKey[] = [
   "warehouseProduction",
   "menuItems",
   "warehouseTransfers",
+  "outletStockRemovals",
   "reports",
 ];
 
@@ -155,6 +172,7 @@ const OUTLET_USER_NAV: NavKey[] = [
   "outletItems",
   "outletPurchases",
   "outletPos",
+  "outletStockRemovals",
   "reports",
 ];
 

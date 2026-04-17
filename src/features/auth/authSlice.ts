@@ -182,6 +182,10 @@ export function normalizeAuthRole(role: string | null | undefined): string {
 export const selectIsSuperAdmin = (s: { auth: AuthState }) =>
   normalizeAuthRole(s.auth.role) === "SuperAdmin";
 
+/** Daily expense log (API: SuperAdmin only). */
+export const selectCanManageDailyExpenses = (s: { auth: AuthState }) =>
+  selectIsSuperAdmin(s);
+
 export const selectIsWarehouseUser = (s: { auth: AuthState }) =>
   normalizeAuthRole(s.auth.role) === "WarehouseUser";
 
@@ -200,6 +204,10 @@ export const selectCanManageOutlets = (s: { auth: AuthState }) =>
 export const selectCanPostWarehouseInventory = (s: { auth: AuthState }) =>
   selectIsSuperAdmin(s) || selectIsWarehouseUser(s);
 
+/** Monthly business sheet report (API: SuperAdmin or WarehouseUser). */
+export const selectCanViewMonthlyBusinessSheet = (s: { auth: AuthState }) =>
+  selectIsSuperAdmin(s) || selectIsWarehouseUser(s);
+
 /** Outlet purchases UI (API: SuperAdmin or OutletUser). */
 export const selectCanUseOutletPurchasePage = (s: { auth: AuthState }) =>
   selectIsSuperAdmin(s) || selectIsOutletUser(s);
@@ -207,6 +215,10 @@ export const selectCanUseOutletPurchasePage = (s: { auth: AuthState }) =>
 /** POS / outlet sales (API: SuperAdmin or OutletUser). */
 export const selectCanUseOutletPos = (s: { auth: AuthState }) =>
   selectIsSuperAdmin(s) || selectIsOutletUser(s);
+
+/** View outlet stock removals list/detail (API: SuperAdmin, OutletUser, or WarehouseUser). */
+export const selectCanViewOutletStockRemovals = (s: { auth: AuthState }) =>
+  selectIsSuperAdmin(s) || selectIsOutletUser(s) || selectIsWarehouseUser(s);
 
 /** Manage outlet retail catalog (API: SuperAdmin or WarehouseUser). */
 export const selectCanManageOutletItems = (s: { auth: AuthState }) =>

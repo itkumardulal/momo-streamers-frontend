@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,14 @@ function formatAmount(n: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function parseMoneyInput(str: string) {
+  const t = str.trim();
+  if (t === "") return { amount: 0, invalid: false };
+  const n = Number(t);
+  if (!Number.isFinite(n) || n < 0) return { amount: 0, invalid: true };
+  return { amount: Math.round(n * 100) / 100, invalid: false };
 }
 
 function formatDateTime(iso: string) {
@@ -96,6 +104,8 @@ export default function OutletSalesPage() {
 
   const [cart, setCart] = useState<CartLine[]>([]);
   const [otherChargeStr, setOtherChargeStr] = useState("");
+  const [cashPaidStr, setCashPaidStr] = useState("0");
+  const [bankPaidStr, setBankPaidStr] = useState("0");
   const [notes, setNotes] = useState("");
   const [createSale, { isLoading: submitting }] = useCreateOutletSaleMutation();
 
@@ -107,7 +117,7 @@ export default function OutletSalesPage() {
       const q = Number(l.qty);
       const p = Number(l.unitPrice);
       if (Number.isFinite(q) && Number.isFinite(p) && q > 0 && p >= 0)
-        t += q * p;
+        t += Math.round(q * p * 100) / 100;
     }
     return Math.round(t * 100) / 100;
   }, [cart]);
@@ -125,6 +135,90 @@ export default function OutletSalesPage() {
     otherChargeResult.invalid
       ? cartTotal
       : Math.round((cartTotal + otherChargeResult.amount) * 100) / 100;
+
+  useEffect(() => {
+    setCashPaidStr(String(grandTotalPreview));
+    setBankPaidStr("0");
+  }, [grandTotalPreview]);
+
+  const cashPaidResult = useMemo(
+    () => parseMoneyInput(cashPaidStr),
+    [cashPaidStr],
+  );
+  const bankPaidResult = useMemo(
+    () => parseMoneyInput(bankPaidStr),
+    [bankPaidStr],
+  );
+
+  const paymentSplitValid =
+    !otherChargeResult.invalid &&
+    !cashPaidResult.invalid &&
+    !bankPaidResult.invalid &&
+    Math.round((cashPaidResult.amount + bankPaidResult.amount) * 100) ===
+      Math.round(grandTotalPreview * 100);
+
+  const paymentRemainder = useMemo(() => {
+    if (otherChargeResult.invalid) return null;
+    if (cashPaidResult.invalid || bankPaidResult.invalid) return null;
+    return (
+      Math.round(
+        (grandTotalPreview - cashPaidResult.amount - bankPaidResult.amount) *
+          100,
+      ) / 100
+    );
+  }, [
+    otherChargeResult.invalid,
+    cashPaidResult.invalid,
+    cashPaidResult.amount,
+    bankPaidResult.invalid,
+    bankPaidResult.amount,
+    grandTotalPreview,
+  ]);
+
+  const roundMoneyStr = (n: number) =>
+    String(Math.round(Math.max(0, n) * 100) / 100);
+
+  const setAllCashPayment = useCallback(() => {
+    setCashPaidStr(roundMoneyStr(grandTotalPreview));
+    setBankPaidStr("0");
+  }, [grandTotalPreview]);
+
+  const setAllBankPayment = useCallback(() => {
+    setCashPaidStr("0");
+    setBankPaidStr(roundMoneyStr(grandTotalPreview));
+  }, [grandTotalPreview]);
+
+  /** After editing cash, set bank so cash + bank = grand total. */
+  const fillBankFromCash = useCallback(() => {
+    if (otherChargeResult.invalid) return;
+    const c = parseMoneyInput(cashPaidStr);
+    const b = parseMoneyInput(bankPaidStr);
+    if (!c.invalid && !b.invalid && c.amount >= 0 && b.amount >= 0) {
+      const sumCents =
+        Math.round(c.amount * 100) + Math.round(b.amount * 100);
+      const grandCents = Math.round(grandTotalPreview * 100);
+      if (sumCents === grandCents) return;
+    }
+    if (c.invalid || c.amount < 0) return;
+    const bank = Math.round((grandTotalPreview - c.amount) * 100) / 100;
+    setBankPaidStr(roundMoneyStr(bank));
+  }, [cashPaidStr, bankPaidStr, grandTotalPreview, otherChargeResult.invalid]);
+
+  /** After editing bank, set cash so cash + bank = grand total. */
+  const fillCashFromBank = useCallback(() => {
+    if (otherChargeResult.invalid) return;
+    const c = parseMoneyInput(cashPaidStr);
+    const b = parseMoneyInput(bankPaidStr);
+    if (!c.invalid && !b.invalid && c.amount >= 0 && b.amount >= 0) {
+      const sumCents =
+        Math.round(c.amount * 100) + Math.round(b.amount * 100);
+      const grandCents = Math.round(grandTotalPreview * 100);
+      if (sumCents === grandCents) return;
+    }
+    if (b.invalid || b.amount < 0) return;
+    const cash = Math.round((grandTotalPreview - b.amount) * 100) / 100;
+    setCashPaidStr(roundMoneyStr(cash));
+  }, [cashPaidStr, bankPaidStr, grandTotalPreview, otherChargeResult.invalid]);
 
   const addFromStock = (row: (typeof stockRows)[number]) => {
     if (row.source === OutletStockSource.Warehouse) {
@@ -246,10 +340,16 @@ export default function OutletSalesPage() {
       toast.error("Enter a valid other charge (zero or positive number).");
       return;
     }
+    if (!paymentSplitValid) {
+      toast.error("Cash plus bank must equal the grand total.");
+      return;
+    }
     try {
       const res = await createSale({
         notes: notes.trim() ? notes.trim() : null,
         otherChargeAmount: otherChargeResult.amount,
+        cashPaidAmount: cashPaidResult.amount,
+        bankPaidAmount: bankPaidResult.amount,
         menuLines,
         directLines,
         ...(isSuperAdmin ? { outletId: effectiveOutletId } : {}),
@@ -296,7 +396,9 @@ export default function OutletSalesPage() {
         <h2 className="text-xl font-semibold text-foreground">Outlet POS</h2>
         <p className="text-sm text-muted-foreground">
           Sell menu stock (from warehouse transfers) and direct retail items.
-          Quantities cannot exceed on-hand; the server re-checks on submit.
+          Quantities cannot exceed on-hand; the server re-checks on submit. One
+          sale can combine cash and bank in a single payment—split the amounts
+          below to match what the customer paid.
         </p>
       </div>
 
@@ -502,6 +604,112 @@ export default function OutletSalesPage() {
               </div>
 
               <div className="space-y-2 border-t border-border pt-3">
+                <Label>Payment — cash and bank (same sale)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Record how much the customer paid in cash vs bank/transfer in
+                  one go. When the cart total changes, payment defaults to all
+                  cash—adjust as needed. Leaving a field and tabbing out fills
+                  the other side to match the grand total.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={setAllCashPayment}
+                    disabled={otherChargeResult.invalid}
+                  >
+                    All cash
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={setAllBankPayment}
+                    disabled={otherChargeResult.invalid}
+                  >
+                    All bank
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={fillBankFromCash}
+                    disabled={otherChargeResult.invalid}
+                  >
+                    Fill bank from cash
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={fillCashFromBank}
+                    disabled={otherChargeResult.invalid}
+                  >
+                    Fill cash from bank
+                  </Button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="pos-cash" className="text-xs">
+                      Cash received
+                    </Label>
+                    <Input
+                      id="pos-cash"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={cashPaidStr}
+                      onChange={(e) => setCashPaidStr(e.target.value)}
+                      onBlur={fillBankFromCash}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="pos-bank" className="text-xs">
+                      Bank / transfer received
+                    </Label>
+                    <Input
+                      id="pos-bank"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={bankPaidStr}
+                      onChange={(e) => setBankPaidStr(e.target.value)}
+                      onBlur={fillCashFromBank}
+                    />
+                  </div>
+                </div>
+                {paymentRemainder !== null ? (
+                  <div
+                    className={cn(
+                      "flex justify-between gap-2 rounded-md border px-2 py-1.5 text-sm tabular-nums",
+                      Math.abs(paymentRemainder) < 0.005
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                        : "border-amber-200 bg-amber-50 text-amber-950",
+                    )}
+                  >
+                    <span className="font-medium">Remaining to match total</span>
+                    <span>
+                      {paymentRemainder > 0 ? "+" : ""}
+                      {formatAmount(paymentRemainder)}
+                    </span>
+                  </div>
+                ) : null}
+                {cashPaidResult.invalid || bankPaidResult.invalid ? (
+                  <p className="text-xs text-destructive">
+                    Enter valid cash and bank amounts (zero or positive).
+                  </p>
+                ) : !paymentSplitValid && !otherChargeResult.invalid ? (
+                  <p className="text-xs text-destructive">
+                    Cash plus bank (
+                    {formatAmount(cashPaidResult.amount + bankPaidResult.amount)}
+                    ) must equal {formatAmount(grandTotalPreview)}. Use the
+                    buttons above or tab out of a field to auto-balance.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="space-y-2 border-t border-border pt-3">
                 <Label htmlFor="pos-notes">Notes (optional)</Label>
                 <Input
                   id="pos-notes"
@@ -517,7 +725,8 @@ export default function OutletSalesPage() {
                     submitting ||
                     anyOverStock ||
                     cart.length === 0 ||
-                    otherChargeResult.invalid
+                    otherChargeResult.invalid ||
+                    !paymentSplitValid
                   }
                   onClick={() => void onCheckout()}
                 >
@@ -544,6 +753,8 @@ export default function OutletSalesPage() {
                     <TableHead>When</TableHead>
                     {isSuperAdmin ? <TableHead>Outlet</TableHead> : null}
                     <TableHead className="text-right">Other ch.</TableHead>
+                    <TableHead className="text-right">Cash</TableHead>
+                    <TableHead className="text-right">Bank</TableHead>
                     <TableHead className="text-right">Grand total</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -551,7 +762,7 @@ export default function OutletSalesPage() {
                   {salesRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={isSuperAdmin ? 5 : 4}
+                        colSpan={isSuperAdmin ? 7 : 6}
                         className="text-muted-foreground"
                       >
                         No sales yet for this outlet.
@@ -571,6 +782,12 @@ export default function OutletSalesPage() {
                         ) : null}
                         <TableCell className="text-right tabular-nums">
                           {formatAmount(s.otherChargeAmount ?? 0)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatAmount(s.cashPaidAmount ?? 0)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatAmount(s.bankPaidAmount ?? 0)}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {formatAmount(s.grandTotal)}

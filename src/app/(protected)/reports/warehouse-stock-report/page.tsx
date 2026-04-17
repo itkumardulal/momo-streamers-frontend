@@ -167,8 +167,8 @@ export default function WarehouseStockReportPage() {
           Warehouse daily stock
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          One table per day (UTC). Columns for transfers match your warehouse
-          outlets.
+          One table per day (UTC). Opening includes menu opening stock for that
+          day. Transfer columns match your warehouse outlets.
         </p>
       </div>
 

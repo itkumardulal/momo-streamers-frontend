@@ -13,6 +13,9 @@ import type {
   CreateUserRequest,
   CreateWarehouseRequest,
   ExpenseItem,
+  ExpenseEntry,
+  CreateExpenseEntryRequest,
+  UpdateExpenseEntryRequest,
   ForgotPasswordRequest,
   LoginRequest,
   LoginResponse,
@@ -49,10 +52,22 @@ import type {
   CreateOutletSaleRequest,
   OutletSaleDetail,
   OutletSaleListItem,
+  OutletSalesMarginEstimate,
+  CreateOutletStockRemovalRequest,
+  OutletStockRemovalDetail,
+  OutletStockRemovalListItem,
   WarehouseTransferDetail,
   WarehouseTransferListItem,
   CreateWarehouseTransferRequest,
   WarehouseDailyStockReport,
+  OutletDailyStockReport,
+  OutletDailySheetReport,
+  MonthlyBusinessSheet,
+  PerOutletPerformanceYear,
+  PerOutletPerformanceReport,
+  PerOutletPerformanceGranularity,
+  DashboardStockSummary,
+  DashboardFinancialSummary,
 } from "@/entities/types";
 import type { AuthState } from "@/features/auth/authSlice";
 
@@ -82,6 +97,7 @@ export const apiSlice = createApi({
     "MenuItem",
     "RawMaterialItem",
     "ExpenseItem",
+    "ExpenseEntry",
     "Supplier",
     "WarehouseTransfer",
     "WarehouseProduction",
@@ -90,6 +106,7 @@ export const apiSlice = createApi({
     "OutletItemPurchase",
     "OutletSale",
     "OutletSellableStock",
+    "OutletStockRemoval",
   ],
   endpoints: (builder) => ({
     login: builder.mutation<ApiResponse<LoginResponse>, LoginRequest>({
@@ -340,6 +357,42 @@ export const apiSlice = createApi({
       query: (id) => ({ url: `/api/expense-items/${id}`, method: "DELETE" }),
       invalidatesTags: ["ExpenseItem"],
     }),
+    getExpenseEntries: builder.query<
+      ApiResponse<ExpenseEntry[]>,
+      { fromDate: string; toDate: string }
+    >({
+      query: ({ fromDate, toDate }) => ({
+        url: "/api/expense-entries",
+        params: { fromDate, toDate },
+      }),
+      providesTags: ["ExpenseEntry"],
+    }),
+    createExpenseEntry: builder.mutation<
+      ApiResponse<ExpenseEntry>,
+      CreateExpenseEntryRequest
+    >({
+      query: (body) => ({
+        url: "/api/expense-entries",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["ExpenseEntry"],
+    }),
+    updateExpenseEntry: builder.mutation<
+      ApiResponse<ExpenseEntry>,
+      { id: string; body: UpdateExpenseEntryRequest }
+    >({
+      query: ({ id, body }) => ({
+        url: `/api/expense-entries/${id}`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["ExpenseEntry"],
+    }),
+    deleteExpenseEntry: builder.mutation<ApiResponse<null>, string>({
+      query: (id) => ({ url: `/api/expense-entries/${id}`, method: "DELETE" }),
+      invalidatesTags: ["ExpenseEntry"],
+    }),
     getSuppliers: builder.query<ApiResponse<Supplier[]>, string | undefined>({
       query: (forPurchaseContext) => ({
         url: "/api/suppliers",
@@ -564,11 +617,30 @@ export const apiSlice = createApi({
     }),
     getOutletSales: builder.query<
       ApiResponse<OutletSaleListItem[]>,
-      { outletId?: string } | void
+      { outletId?: string; fromDate?: string; toDate?: string } | void
     >({
       query: (arg) => ({
         url: "/api/outlet-sales",
-        params: arg?.outletId ? { outletId: arg.outletId } : {},
+        params: {
+          ...(arg?.outletId ? { outletId: arg.outletId } : {}),
+          ...(arg?.fromDate && arg?.toDate
+            ? { fromDate: arg.fromDate, toDate: arg.toDate }
+            : {}),
+        },
+      }),
+      providesTags: [{ type: "OutletSale", id: "LIST" }],
+    }),
+    getOutletSalesMarginEstimate: builder.query<
+      ApiResponse<OutletSalesMarginEstimate>,
+      { outletId?: string; fromDate: string; toDate: string }
+    >({
+      query: ({ outletId, fromDate, toDate }) => ({
+        url: "/api/outlet-sales/margin-estimate",
+        params: {
+          fromDate,
+          toDate,
+          ...(outletId ? { outletId } : {}),
+        },
       }),
       providesTags: [{ type: "OutletSale", id: "LIST" }],
     }),
@@ -587,6 +659,42 @@ export const apiSlice = createApi({
         "MenuItem",
       ],
     }),
+    getOutletStockRemovals: builder.query<
+      ApiResponse<OutletStockRemovalListItem[]>,
+      { outletId?: string; fromDate?: string; toDate?: string } | void
+    >({
+      query: (arg) => ({
+        url: "/api/outlet-stock-removals",
+        params: {
+          ...(arg?.outletId ? { outletId: arg.outletId } : {}),
+          ...(arg?.fromDate && arg?.toDate
+            ? { fromDate: arg.fromDate, toDate: arg.toDate }
+            : {}),
+        },
+      }),
+      providesTags: [{ type: "OutletStockRemoval", id: "LIST" }],
+    }),
+    getOutletStockRemovalById: builder.query<
+      ApiResponse<OutletStockRemovalDetail>,
+      string
+    >({
+      query: (id) => `/api/outlet-stock-removals/${id}`,
+      providesTags: (_r, _e, id) => [{ type: "OutletStockRemoval", id }],
+    }),
+    createOutletStockRemoval: builder.mutation<
+      ApiResponse<OutletStockRemovalDetail>,
+      CreateOutletStockRemovalRequest
+    >({
+      query: (body) => ({
+        url: "/api/outlet-stock-removals",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [
+        "OutletSellableStock",
+        { type: "OutletStockRemoval", id: "LIST" },
+      ],
+    }),
     getWarehouseDailyStockReport: builder.query<
       ApiResponse<WarehouseDailyStockReport>,
       { warehouseId?: string; fromDate: string; toDate: string }
@@ -598,6 +706,88 @@ export const apiSlice = createApi({
           toDate,
           ...(warehouseId ? { warehouseId } : {}),
         },
+      }),
+    }),
+    getOutletDailyStockReport: builder.query<
+      ApiResponse<OutletDailyStockReport>,
+      { outletId: string; fromDate: string; toDate: string }
+    >({
+      query: ({ outletId, fromDate, toDate }) => ({
+        url: "/api/reports/outlet-daily-stock",
+        params: { outletId, fromDate, toDate },
+      }),
+    }),
+    getOutletDailySheetReport: builder.query<
+      ApiResponse<OutletDailySheetReport>,
+      { outletId: string; date: string }
+    >({
+      query: ({ outletId, date }) => ({
+        url: "/api/reports/outlet-daily-sheet",
+        params: { outletId, date },
+      }),
+    }),
+    getDashboardStockSummary: builder.query<
+      ApiResponse<DashboardStockSummary>,
+      {
+        fromDate: string;
+        toDate: string;
+        warehouseId?: string;
+        outletId?: string;
+      }
+    >({
+      query: ({ fromDate, toDate, warehouseId, outletId }) => ({
+        url: "/api/reports/dashboard-stock-summary",
+        params: {
+          fromDate,
+          toDate,
+          ...(warehouseId ? { warehouseId } : {}),
+          ...(outletId ? { outletId } : {}),
+        },
+      }),
+    }),
+    getDashboardFinancialSummary: builder.query<
+      ApiResponse<DashboardFinancialSummary>,
+      { fromDate: string; toDate: string; outletId?: string }
+    >({
+      query: ({ fromDate, toDate, outletId }) => ({
+        url: "/api/reports/dashboard-financial-summary",
+        params: {
+          fromDate,
+          toDate,
+          ...(outletId ? { outletId } : {}),
+        },
+      }),
+    }),
+    getMonthlyBusinessSheet: builder.query<
+      ApiResponse<MonthlyBusinessSheet>,
+      { year: number; month: number; warehouseId: string }
+    >({
+      query: ({ year, month, warehouseId }) => ({
+        url: "/api/reports/monthly-business-sheet",
+        params: { year, month, warehouseId },
+      }),
+    }),
+    getPerOutletPerformanceYear: builder.query<
+      ApiResponse<PerOutletPerformanceYear>,
+      { year: number; warehouseId: string }
+    >({
+      query: ({ year, warehouseId }) => ({
+        url: "/api/reports/per-outlet-performance-year",
+        params: { year, warehouseId },
+      }),
+    }),
+    getPerOutletPerformance: builder.query<
+      ApiResponse<PerOutletPerformanceReport>,
+      {
+        warehouseId: string;
+        granularity: PerOutletPerformanceGranularity;
+        fromDate: string;
+        toDate: string;
+      }
+    >({
+      query: ({ warehouseId, granularity, fromDate, toDate }) => ({
+        url: "/api/reports/per-outlet-performance",
+        params: { warehouseId, granularity, fromDate, toDate },
       }),
     }),
   }),
@@ -636,6 +826,10 @@ export const {
   useCreateExpenseItemMutation,
   useUpdateExpenseItemMutation,
   useDeleteExpenseItemMutation,
+  useGetExpenseEntriesQuery,
+  useCreateExpenseEntryMutation,
+  useUpdateExpenseEntryMutation,
+  useDeleteExpenseEntryMutation,
   useGetSuppliersQuery,
   useCreateSupplierMutation,
   useUpdateSupplierMutation,
@@ -666,8 +860,21 @@ export const {
   useCreateOutletItemPurchaseMutation,
   useGetOutletSellableStockQuery,
   useGetOutletSalesQuery,
+  useGetOutletSalesMarginEstimateQuery,
   useGetOutletSaleByIdQuery,
   useLazyGetOutletSaleByIdQuery,
   useCreateOutletSaleMutation,
+  useGetOutletStockRemovalsQuery,
+  useGetOutletStockRemovalByIdQuery,
+  useLazyGetOutletStockRemovalByIdQuery,
+  useCreateOutletStockRemovalMutation,
   useLazyGetWarehouseDailyStockReportQuery,
+  useLazyGetOutletDailyStockReportQuery,
+  useLazyGetOutletDailySheetReportQuery,
+  useGetDashboardStockSummaryQuery,
+  useGetDashboardFinancialSummaryQuery,
+  useGetMonthlyBusinessSheetQuery,
+  useLazyGetMonthlyBusinessSheetQuery,
+  useLazyGetPerOutletPerformanceYearQuery,
+  useLazyGetPerOutletPerformanceQuery,
 } = apiSlice;

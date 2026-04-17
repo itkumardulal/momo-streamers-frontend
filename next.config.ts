@@ -41,6 +41,15 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: publicApiUrl,
   },
+  async redirects() {
+    return [
+      {
+        source: "/reports/outlet-performance-year",
+        destination: "/reports/outlet-performance",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
