@@ -38,6 +38,7 @@ const publicApiUrl =
   defaultPublicApiUrl;
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   env: {
     NEXT_PUBLIC_API_URL: publicApiUrl,
   },
