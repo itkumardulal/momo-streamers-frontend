@@ -152,7 +152,10 @@ export function WarehouseDocumentViewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg" showCloseButton>
+      <DialogContent
+        className="max-h-[90vh] w-[calc(100%-1.5rem)] max-w-[95vw] overflow-y-auto sm:max-w-2xl"
+        showCloseButton
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>

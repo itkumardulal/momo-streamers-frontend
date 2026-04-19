@@ -735,7 +735,7 @@ export function DashboardView() {
                   <CardTitle className="text-base">Sales mix</CardTitle>
                   <CardDescription>Share of menu category revenue</CardDescription>
                 </CardHeader>
-                <CardContent className="h-72">
+                <CardContent className="min-h-[220px] h-72">
                   {financialCategoryPie.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No mix data.</p>
                   ) : (
@@ -775,7 +775,7 @@ export function DashboardView() {
                     : "Up to 10 outlets by total sales in range; remaining outlets grouped as Other outlets."}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="h-80">
+              <CardContent className="min-h-[220px] h-80">
                 {financialOutletLineChart.data.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No sales in range.</p>
                 ) : (
@@ -811,7 +811,7 @@ export function DashboardView() {
                 <CardTitle className="text-base">Daily est. net profit vs collection</CardTitle>
                 <CardDescription>Estimated profit uses current menu costs (see note above).</CardDescription>
               </CardHeader>
-              <CardContent className="h-72">
+              <CardContent className="min-h-[220px] h-72">
                 {financialProfitCollectionData.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No data.</p>
                 ) : (
@@ -956,7 +956,7 @@ export function DashboardView() {
                         <CardTitle className="text-base">Warehouse — in vs out by day</CardTitle>
                         <CardDescription>Production in vs transfers + damage out</CardDescription>
                       </CardHeader>
-                      <CardContent className="h-72">
+                      <CardContent className="min-h-[220px] h-72">
                         {dashStock.warehouse.trendByDay.length === 0 ? (
                           <p className="text-sm text-muted-foreground">No movement in this range.</p>
                         ) : (
@@ -996,7 +996,7 @@ export function DashboardView() {
                         <CardTitle className="text-base">Transfer out by outlet</CardTitle>
                         <CardDescription>Total units transferred in range</CardDescription>
                       </CardHeader>
-                      <CardContent className="h-72">
+                      <CardContent className="min-h-[220px] h-72">
                         {dashStock.warehouse.transferOutByOutlet.length === 0 ? (
                           <p className="text-sm text-muted-foreground">No transfers.</p>
                         ) : (
@@ -1089,7 +1089,7 @@ export function DashboardView() {
                         <CardTitle className="text-base">Outlet — in vs out by day</CardTitle>
                         <CardDescription>Transfers/purchases in vs sales and removals out</CardDescription>
                       </CardHeader>
-                      <CardContent className="h-72">
+                      <CardContent className="min-h-[220px] h-72">
                         {dashStock.outlet.trendByDay.length === 0 ? (
                           <p className="text-sm text-muted-foreground">No movement in this range.</p>
                         ) : (
@@ -1129,7 +1129,7 @@ export function DashboardView() {
                         <CardTitle className="text-base">Stock-out composition</CardTitle>
                         <CardDescription>Sold vs damage vs staff (non-sale)</CardDescription>
                       </CardHeader>
-                      <CardContent className="h-72">
+                      <CardContent className="min-h-[220px] h-72">
                         {outletStockOutPie.length === 0 ? (
                           <p className="text-sm text-muted-foreground">No stock-out in this range.</p>
                         ) : (
@@ -1218,7 +1218,7 @@ export function DashboardView() {
             <CardTitle className="text-base">Sales by day</CardTitle>
             <CardDescription>Grand total per UTC day</CardDescription>
           </CardHeader>
-          <CardContent className="h-72">
+          <CardContent className="min-h-[220px] h-72">
             {byDay.length === 0 && !salesLoading ? (
               <p className="text-sm text-muted-foreground">No sales in this range.</p>
             ) : (
@@ -1244,7 +1244,7 @@ export function DashboardView() {
             <CardTitle className="text-base">Cash vs bank</CardTitle>
             <CardDescription>Share of payment mix (cash + bank)</CardDescription>
           </CardHeader>
-          <CardContent className="h-72">
+          <CardContent className="min-h-[220px] h-72">
             {pieData.length === 0 && !salesLoading ? (
               <p className="text-sm text-muted-foreground">No payment data in this range.</p>
             ) : (
@@ -1279,7 +1279,7 @@ export function DashboardView() {
             <CardTitle className="text-base">Sales by outlet</CardTitle>
             <CardDescription>Comparison across outlets in scope</CardDescription>
           </CardHeader>
-          <CardContent className="h-80">
+          <CardContent className="min-h-[220px] h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 layout="vertical"

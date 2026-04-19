@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   Boxes,
   Building2,
@@ -12,6 +13,7 @@ import {
   LayoutDashboard,
   LogOut,
   MapPin,
+  Menu,
   Package,
   Receipt,
   ShoppingCart,
@@ -29,6 +31,10 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -133,6 +139,43 @@ const NAV_META: Record<
   reports: { href: "/reports", label: "Reports", icon: BarChart3 },
 };
 
+/** Longer paths first so nested routes win over `/reports`. */
+const HEADER_TITLE_PREFIXES: { prefix: string; title: string }[] = [
+  {
+    prefix: "/reports/warehouse-stock-report",
+    title: "Warehouse daily stock",
+  },
+  {
+    prefix: "/reports/outlet-daily-stock-report",
+    title: "Outlet daily stock",
+  },
+  {
+    prefix: "/reports/outlet-performance",
+    title: "Outlet performance comparison",
+  },
+  {
+    prefix: "/reports/outlet-daily-sheet",
+    title: "Outlet daily sheet",
+  },
+  {
+    prefix: "/reports/monthly-business-sheet",
+    title: "Monthly business sheet",
+  },
+  ...Object.values(NAV_META).map(({ href, label }) => ({
+    prefix: href,
+    title: label,
+  })),
+].sort((a, b) => b.prefix.length - a.prefix.length);
+
+function headerTitleForPath(pathname: string): string {
+  for (const { prefix, title } of HEADER_TITLE_PREFIXES) {
+    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+      return title;
+    }
+  }
+  return "Dashboard";
+}
+
 /** Dashboard first; remaining order is role-specific. */
 const SUPER_ADMIN_NAV: NavKey[] = [
   "dashboard",
@@ -142,10 +185,10 @@ const SUPER_ADMIN_NAV: NavKey[] = [
   "rawMaterials",
   "suppliers",
   "rawMaterialPurchases",
-  "warehouseProduction",
   "menuCategories",
   "catalogItems",
   "menuItems",
+  "warehouseProduction",
   "warehouseTransfers",
   "outletItems",
   "outletPurchases",
@@ -160,8 +203,8 @@ const WAREHOUSE_USER_NAV: NavKey[] = [
   "dashboard",
   "rawMaterials",
   "rawMaterialPurchases",
-  "warehouseProduction",
   "menuItems",
+  "warehouseProduction",
   "warehouseTransfers",
   "outletStockRemovals",
   "reports",
@@ -190,14 +233,100 @@ function isNavItemActive(pathname: string, href: string): boolean {
   return pathname.startsWith(`${href}/`);
 }
 
+type NavItem = { href: string; label: string; icon: LucideIcon };
+
+function SidebarNavLinks({
+  items,
+  pathname,
+  onNavigate,
+  className,
+}: {
+  items: NavItem[];
+  pathname: string;
+  onNavigate?: () => void;
+  className?: string;
+}) {
+  return (
+    <nav
+      className={cn(
+        "flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain p-2",
+        className,
+      )}
+    >
+      {items.map((item) => {
+        const Icon = item.icon;
+        const active = isNavItemActive(pathname, item.href);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={() => onNavigate?.()}
+            className={cn(
+              "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              active
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            )}
+          >
+            <Icon className="size-4 shrink-0" />
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function SidebarChrome({
+  authEmail,
+  roleLine,
+  children,
+}: {
+  authEmail: string;
+  roleLine: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <div className="shrink-0 border-b border-border px-4 py-5">
+        <div className="flex items-center gap-3">
+          <BrandLogo size={52} className="shadow-sm" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              MO:MO STEAMERS
+            </p>
+            <p className="mt-0.5 truncate text-sm font-medium text-foreground">
+              {authEmail}
+            </p>
+            <p className="text-xs text-muted-foreground">{roleLine}</p>
+          </div>
+        </div>
+      </div>
+      {children}
+    </>
+  );
+}
+
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const auth = useAppSelector(selectAuth);
-  /** Single source for sidebar (same normalization as login); avoids mismatch with selectors. */
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   const roleNorm = normalizeAuthRole(auth.role);
-  const sidebarNav = navKeysForRole(roleNorm).map((key) => NAV_META[key]);
+  const sidebarNav = useMemo(
+    () => navKeysForRole(roleNorm).map((key) => NAV_META[key]),
+    [roleNorm],
+  );
+  const roleLine = roleNorm || auth.role || "—";
+  const authEmail = auth.email ?? "";
+  const pageTitle = headerTitleForPath(pathname);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
+
   const handleLogout = (message = "Signed out") => {
     dispatch(apiSlice.util.resetApiState());
     dispatch(logout());
@@ -207,44 +336,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <aside className="flex h-svh max-h-screen w-56 shrink-0 flex-col border-r border-border bg-white shadow-sm">
-        <div className="shrink-0 border-b border-border px-4 py-5">
-          <div className="flex items-center gap-3">
-            <BrandLogo size={52} className="shadow-sm" />
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-                MO:MO STEAMERS
-              </p>
-              <p className="mt-0.5 truncate text-sm font-medium text-foreground">
-                {auth.email}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {roleNorm || auth.role || "—"}
-              </p>
-            </div>
-          </div>
-        </div>
-        <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain p-2">
-          {sidebarNav.map((item) => {
-            const Icon = item.icon;
-            const active = isNavItemActive(pathname, item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                )}
-              >
-                <Icon className="size-4 shrink-0" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+      <aside className="hidden h-svh max-h-screen w-56 shrink-0 flex-col border-r border-border bg-white shadow-sm lg:flex">
+        <SidebarChrome authEmail={authEmail} roleLine={roleLine}>
+          <SidebarNavLinks items={sidebarNav} pathname={pathname} />
+        </SidebarChrome>
         <div className="shrink-0 border-t border-border p-2">
           <Button
             type="button"
@@ -257,12 +352,60 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
       </aside>
+
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border bg-white px-6 py-4 shadow-sm sm:px-8">
-          <h1 className="text-lg font-semibold text-foreground">
-            Company dashboard
-          </h1>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-white px-4 py-3 shadow-sm sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <Dialog open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="shrink-0 lg:hidden"
+                aria-label="Open menu"
+                onClick={() => setMobileNavOpen(true)}
+              >
+                <Menu className="size-4" />
+              </Button>
+              <DialogContent
+                showCloseButton
+                className={cn(
+                  "fixed top-0 left-0 z-50 flex h-dvh max-h-[100dvh] w-[min(100%,18rem)] max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 bg-popover p-0 shadow-lg ring-1 ring-foreground/10 outline-none",
+                  "data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-left-4",
+                  "data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-left-4",
+                )}
+              >
+                <SidebarChrome authEmail={authEmail} roleLine={roleLine}>
+                  <SidebarNavLinks
+                    items={sidebarNav}
+                    pathname={pathname}
+                    onNavigate={() => setMobileNavOpen(false)}
+                  />
+                </SidebarChrome>
+                <div className="shrink-0 border-t border-border p-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    onClick={() => {
+                      setMobileNavOpen(false);
+                      handleLogout();
+                    }}
+                  >
+                    <LogOut className="size-4" />
+                    Sign out
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <div className="flex min-w-0 items-center gap-2 lg:hidden">
+              <BrandLogo size={36} className="shadow-sm" />
+            </div>
+            <h1 className="min-w-0 truncate text-base font-semibold text-foreground sm:text-lg">
+              {pageTitle}
+            </h1>
+          </div>
+          <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
             <Button
               type="button"
               variant="outline"
@@ -271,7 +414,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               onClick={() => handleLogout()}
             >
               <LogOut className="size-3.5" />
-              Sign out
+              <span className="hidden sm:inline">Sign out</span>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -285,8 +428,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 }
               >
                 <User className="size-4 shrink-0" />
-                <span className="max-w-[120px] truncate sm:max-w-[180px]">
-                  {auth.email}
+                <span className="max-w-[100px] truncate sm:max-w-[180px]">
+                  {authEmail}
                 </span>
                 <ChevronDown className="size-3.5 shrink-0 opacity-60" />
               </DropdownMenuTrigger>
@@ -294,7 +437,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <DropdownMenuLabel>Account</DropdownMenuLabel>
                 <div className="px-1.5 pb-2 text-xs text-muted-foreground">
                   <p className="truncate font-medium text-foreground">
-                    {auth.email}
+                    {authEmail}
                   </p>
                   <p>{auth.role}</p>
                 </div>
@@ -310,7 +453,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </DropdownMenu>
           </div>
         </header>
-        <main className="flex-1 p-8">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

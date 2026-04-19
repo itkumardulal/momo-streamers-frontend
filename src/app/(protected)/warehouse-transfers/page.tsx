@@ -64,6 +64,12 @@ function formatDate(iso: string) {
 
 type LineRow = { menuItemId: string; quantity: string };
 
+function parsePositiveQty(raw: string): number | null {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
 export default function WarehouseTransfersPage() {
   const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
   const userWarehouseId = useAppSelector(selectAuthWarehouseId);
@@ -117,6 +123,49 @@ export default function WarehouseTransfersPage() {
   });
   const menuItems = menuRes?.success ? menuRes.data ?? [] : [];
 
+  const menuItemMap = useMemo(
+    () => new Map(menuItems.map((m) => [m.id, m])),
+    [menuItems],
+  );
+
+  const transferDraft = useMemo(() => {
+    let totalQty = 0;
+    const merged = new Map<string, number>();
+    let validLineCount = 0;
+
+    for (const line of lines) {
+      const menuItemId = line.menuItemId.trim();
+      const qty = parsePositiveQty(line.quantity);
+      if (menuItemId && qty !== null) {
+        validLineCount += 1;
+        totalQty += qty;
+        merged.set(menuItemId, (merged.get(menuItemId) ?? 0) + qty);
+      }
+    }
+
+    const distinctItemCount = merged.size;
+    const stockShort: { name: string; need: number; onHand: number }[] = [];
+    for (const [menuItemId, need] of merged) {
+      const onHand = menuItemMap.get(menuItemId)?.quantityOnHand ?? 0;
+      if (need > onHand) {
+        stockShort.push({
+          name: menuItemMap.get(menuItemId)?.name ?? "Menu item",
+          need,
+          onHand,
+        });
+      }
+    }
+
+    return {
+      totalQty,
+      merged,
+      validLineCount,
+      distinctItemCount,
+      stockShort,
+      hasStockError: stockShort.length > 0,
+    };
+  }, [lines, menuItemMap]);
+
   const outletsForCreate = useMemo(() => {
     if (!createWh) return [];
     return allOutlets.filter((o) => o.warehouseId === createWh);
@@ -145,6 +194,27 @@ export default function WarehouseTransfersPage() {
     setCreateWarehouseId(listWarehouseFilter || userWarehouseId || "");
   };
 
+  const maxQtyForLineIndex = (idx: number): number | undefined => {
+    const line = lines[idx];
+    const menuItemId = line.menuItemId.trim();
+    if (!menuItemId) return undefined;
+    const onHand = menuItemMap.get(menuItemId)?.quantityOnHand ?? 0;
+    let otherSum = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (i === idx) continue;
+      if (lines[i].menuItemId.trim() !== menuItemId) continue;
+      const q = parsePositiveQty(lines[i].quantity);
+      if (q !== null) otherSum += q;
+    }
+    return Math.max(0, onHand - otherSum);
+  };
+
+  const canSubmitTransfer =
+    Boolean(createWh) &&
+    Boolean(createOutletId) &&
+    transferDraft.validLineCount > 0 &&
+    !transferDraft.hasStockError;
+
   const onSubmitTransfer = async () => {
     if (!createWh) {
       toast.error("Select a warehouse");
@@ -163,6 +233,20 @@ export default function WarehouseTransfersPage() {
     if (parsed.length === 0) {
       toast.error("Add at least one line with a menu item and quantity");
       return;
+    }
+    const merged = new Map<string, number>();
+    for (const l of parsed) {
+      merged.set(l.menuItemId, (merged.get(l.menuItemId) ?? 0) + l.quantity);
+    }
+    for (const [menuItemId, need] of merged) {
+      const onHand = menuItemMap.get(menuItemId)?.quantityOnHand ?? 0;
+      if (need > onHand) {
+        const name = menuItemMap.get(menuItemId)?.name ?? "Menu item";
+        toast.error(
+          `Insufficient stock for ${name}: need ${formatAmount(need)}, warehouse has ${formatAmount(onHand)}.`,
+        );
+        return;
+      }
     }
     try {
       const res = await createTransfer({
@@ -249,8 +333,9 @@ export default function WarehouseTransfersPage() {
             <DialogHeader>
               <DialogTitle>Transfer to outlet</DialogTitle>
               <DialogDescription>
-                Stock is removed from the warehouse row and added to the outlet
-                stock for each line.
+                You can only transfer what is on hand in the warehouse (for
+                example after production). Stock is removed from the warehouse
+                and added to the outlet for each line.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -314,7 +399,19 @@ export default function WarehouseTransfersPage() {
                   </Button>
                 </div>
                 <div className="space-y-3">
-                  {lines.map((line, idx) => (
+                  {lines.map((line, idx) => {
+                    const maxQty = maxQtyForLineIndex(idx);
+                    const sel = line.menuItemId.trim()
+                      ? menuItemMap.get(line.menuItemId.trim())
+                      : undefined;
+                    const lineQty = parsePositiveQty(line.quantity);
+                    const overMax =
+                      sel !== undefined &&
+                      lineQty !== null &&
+                      maxQty !== undefined &&
+                      lineQty > maxQty;
+
+                    return (
                     <div
                       key={idx}
                       className="grid gap-2 rounded-lg border border-border p-3 sm:grid-cols-[1fr_100px_auto]"
@@ -338,11 +435,26 @@ export default function WarehouseTransfersPage() {
                         >
                           <option value="">Select</option>
                           {menuItems.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.name} (WH: {formatAmount(m.quantityOnHand)})
+                            <option
+                              key={m.id}
+                              value={m.id}
+                              disabled={m.quantityOnHand <= 0}
+                            >
+                              {m.name}
+                              {m.quantityOnHand <= 0
+                                ? " (no stock — record production first)"
+                                : ` (WH: ${formatAmount(m.quantityOnHand)})`}
                             </option>
                           ))}
                         </select>
+                        {sel ? (
+                          <p className="text-xs text-muted-foreground">
+                            Available in warehouse:{" "}
+                            <span className="font-medium text-foreground tabular-nums">
+                              {formatAmount(sel.quantityOnHand)}
+                            </span>
+                          </p>
+                        ) : null}
                       </div>
                       <div className="space-y-1">
                         <span className="text-xs text-muted-foreground">
@@ -351,6 +463,7 @@ export default function WarehouseTransfersPage() {
                         <Input
                           type="number"
                           min={0}
+                          max={maxQty !== undefined ? maxQty : undefined}
                           step="0.01"
                           value={line.quantity}
                           onChange={(e) => {
@@ -362,6 +475,16 @@ export default function WarehouseTransfersPage() {
                             );
                           }}
                         />
+                        {maxQty !== undefined && sel ? (
+                          <p className="text-xs text-muted-foreground tabular-nums">
+                            Max this line: {formatAmount(maxQty)}
+                          </p>
+                        ) : null}
+                        {overMax ? (
+                          <p className="text-xs text-destructive">
+                            Exceeds available for this item across all lines.
+                          </p>
+                        ) : null}
                       </div>
                       <div className="flex items-end">
                         <Button
@@ -377,8 +500,42 @@ export default function WarehouseTransfersPage() {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+                <p className="font-medium text-foreground">Transfer summary</p>
+                <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                  <li className="tabular-nums">
+                    Total quantity:{" "}
+                    <span className="font-medium text-foreground">
+                      {formatAmount(transferDraft.totalQty)}
+                    </span>
+                  </li>
+                  <li>
+                    Distinct menu items:{" "}
+                    <span className="font-medium text-foreground">
+                      {transferDraft.distinctItemCount}
+                    </span>
+                  </li>
+                  <li>
+                    Lines to record:{" "}
+                    <span className="font-medium text-foreground">
+                      {transferDraft.validLineCount}
+                    </span>
+                  </li>
+                </ul>
+                {transferDraft.hasStockError ? (
+                  <p className="mt-2 text-xs text-destructive">
+                    {transferDraft.stockShort
+                      .map(
+                        (s) =>
+                          `${s.name}: need ${formatAmount(s.need)}, have ${formatAmount(s.onHand)}`,
+                      )
+                      .join(" · ")}
+                  </p>
+                ) : null}
               </div>
             </div>
             <DialogFooter>
@@ -391,7 +548,7 @@ export default function WarehouseTransfersPage() {
               </Button>
               <Button
                 type="button"
-                disabled={creating}
+                disabled={creating || !canSubmitTransfer}
                 onClick={() => void onSubmitTransfer()}
               >
                 {creating ? "Saving…" : "Record transfer"}
