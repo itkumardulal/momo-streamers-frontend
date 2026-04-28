@@ -8,6 +8,7 @@ type BrandLogoProps = {
   priority?: boolean;
 };
 
+
 export function BrandLogo({
   className,
   size = 112,
