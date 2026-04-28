@@ -502,6 +502,7 @@ export const apiSlice = createApi({
       }),
       providesTags: [{ type: "WarehouseProduction", id: "LIST" }],
     }),
+    
     getWarehouseProductionById: builder.query<
       ApiResponse<WarehouseProductionDetail>,
       string
