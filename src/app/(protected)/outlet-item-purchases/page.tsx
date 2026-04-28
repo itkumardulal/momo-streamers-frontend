@@ -134,8 +134,18 @@ export default function OutletItemPurchasesPage() {
     skip: !canUse,
   });
   const { data: supRes } = useGetSuppliersQuery("outlet", { skip: !canUse });
-  const outletItems = itemsRes?.success ? itemsRes.data ?? [] : [];
-  const suppliers = supRes?.success ? supRes.data ?? [] : [];
+  const outletItems = useMemo(
+    () => (itemsRes?.success ? itemsRes.data ?? [] : []),
+    [itemsRes],
+  );
+  const suppliers = useMemo(
+    () => (supRes?.success ? supRes.data ?? [] : []),
+    [supRes],
+  );
+  const outletItemById = useMemo(
+    () => new Map(outletItems.map((i) => [i.id, i])),
+    [outletItems],
+  );
 
   const { data: viewRes, isFetching: viewLoading } =
     useGetOutletItemPurchaseByIdQuery(viewId ?? "", {
@@ -354,7 +364,20 @@ export default function OutletItemPurchasesPage() {
                               const v = e.target.value;
                               setLines((prev) =>
                                 prev.map((row, i) =>
-                                  i === idx ? { ...row, outletItemId: v } : row,
+                                  i === idx
+                                    ? {
+                                        ...row,
+                                        outletItemId: v,
+                                        rate:
+                                          v && outletItemById.get(v)
+                                            ? String(
+                                                Math.round(
+                                                  (outletItemById.get(v)!.costPrice ?? 0) * 100,
+                                                ) / 100,
+                                              )
+                                            : row.rate,
+                                      }
+                                    : row,
                                 ),
                               );
                             }}

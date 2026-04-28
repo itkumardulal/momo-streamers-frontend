@@ -461,14 +461,23 @@ export interface OutletItem {
   name: string;
   unit?: string | null;
   description?: string | null;
+  itemType: OutletItemType;
+  costPrice: number;
   defaultSellPrice: number;
   createdAt: string;
+}
+
+export enum OutletItemType {
+  Sale = 1,
+  NonSale = 2,
 }
 
 export interface CreateOutletItemRequest {
   name: string;
   unit?: string | null;
   description?: string | null;
+  itemType: OutletItemType;
+  costPrice: number;
   defaultSellPrice: number;
 }
 
@@ -476,6 +485,8 @@ export interface UpdateOutletItemRequest {
   name: string;
   unit?: string | null;
   description?: string | null;
+  itemType: OutletItemType;
+  costPrice: number;
   defaultSellPrice: number;
 }
 
@@ -555,6 +566,8 @@ export interface CreateOutletSaleDirectLine {
 
 export interface CreateOutletSaleRequest {
   outletId?: string | null;
+  /** Super Admin warehouse-counter sale only; omit for WarehouseUser (uses JWT). */
+  warehouseId?: string | null;
   saleAtUtc?: string | null;
   notes?: string | null;
   /** Optional delivery/service etc.; omitted means zero. */
@@ -587,8 +600,11 @@ export interface OutletSaleDirectLine {
 export interface OutletSaleListItem {
   id: string;
   receiptNo: string;
-  outletId: string;
+  outletId?: string | null;
   outletName: string;
+  warehouseId?: string | null;
+  warehouseName: string;
+  isWarehouseDirectSale: boolean;
   saleAtUtc: string;
   otherChargeAmount: number;
   grandTotal: number;
@@ -607,8 +623,11 @@ export interface OutletSalesMarginEstimate {
 export interface OutletSaleDetail {
   id: string;
   receiptNo: string;
-  outletId: string;
+  outletId?: string | null;
   outletName: string;
+  warehouseId?: string | null;
+  warehouseName: string;
+  isWarehouseDirectSale: boolean;
   saleAtUtc: string;
   notes?: string | null;
   otherChargeAmount: number;
@@ -1044,6 +1063,9 @@ export interface DashboardFinancialDay {
   collectionTotal: number;
   estimatedCostTotal: number;
   estimatedNetProfit: number;
+  warehousePurchaseExpense: number;
+  outletPurchaseExpense: number;
+  totalPurchaseExpense: number;
 }
 
 export interface DashboardFinancialCategoryRow {

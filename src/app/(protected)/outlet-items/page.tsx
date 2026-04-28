@@ -31,7 +31,7 @@ import {
   useGetOutletItemsQuery,
   useUpdateOutletItemMutation,
 } from "@/features/api/apiSlice";
-import type { OutletItem } from "@/entities/types";
+import { OutletItemType, type OutletItem } from "@/entities/types";
 import {
   selectCanManageOutletItems,
   selectCanViewOutletItemsCatalog,
@@ -44,6 +44,8 @@ const itemFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   unit: z.string().max(30, "Max 30 characters").optional(),
   description: z.string().max(500, "Max 500 characters").optional(),
+  itemType: z.nativeEnum(OutletItemType),
+  costPrice: z.number().min(0, "Cost price cannot be negative"),
   defaultSellPrice: z.number().min(0, "Price cannot be negative"),
 });
 
@@ -90,6 +92,8 @@ export default function OutletItemsPage() {
       name: "",
       unit: "",
       description: "",
+      itemType: OutletItemType.Sale,
+      costPrice: 0,
       defaultSellPrice: 0,
     },
   });
@@ -100,6 +104,8 @@ export default function OutletItemsPage() {
       name: "",
       unit: "",
       description: "",
+      itemType: OutletItemType.Sale,
+      costPrice: 0,
       defaultSellPrice: 0,
     },
   });
@@ -110,6 +116,8 @@ export default function OutletItemsPage() {
       name: editing.name,
       unit: editing.unit ?? "",
       description: editing.description ?? "",
+      itemType: editing.itemType,
+      costPrice: editing.costPrice,
       defaultSellPrice: editing.defaultSellPrice,
     });
   }, [editing, editOpen, editForm]);
@@ -124,6 +132,8 @@ export default function OutletItemsPage() {
         name: values.name.trim(),
         unit,
         description,
+        itemType: values.itemType,
+        costPrice: values.costPrice,
         defaultSellPrice: values.defaultSellPrice,
       }).unwrap();
       if (res.success) {
@@ -133,6 +143,8 @@ export default function OutletItemsPage() {
           name: "",
           unit: "",
           description: "",
+          itemType: OutletItemType.Sale,
+          costPrice: 0,
           defaultSellPrice: 0,
         });
         return;
@@ -154,6 +166,8 @@ export default function OutletItemsPage() {
           name: values.name.trim(),
           unit,
           description,
+          itemType: values.itemType,
+          costPrice: values.costPrice,
           defaultSellPrice: values.defaultSellPrice,
         },
       }).unwrap();
@@ -214,6 +228,8 @@ export default function OutletItemsPage() {
                 name: "",
                 unit: "",
                 description: "",
+                itemType: OutletItemType.Sale,
+                costPrice: 0,
                 defaultSellPrice: 0,
               });
             }
@@ -249,6 +265,35 @@ export default function OutletItemsPage() {
                   rows={2}
                   {...form.register("description")}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="oi-type">Item type</Label>
+                <select
+                  id="oi-type"
+                  className="flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  value={String(form.watch("itemType"))}
+                  onChange={(e) =>
+                    form.setValue("itemType", Number(e.target.value) as OutletItemType)
+                  }
+                >
+                  <option value={String(OutletItemType.Sale)}>Sale</option>
+                  <option value={String(OutletItemType.NonSale)}>Non-sale</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="oi-cost-price">Cost price</Label>
+                <Input
+                  id="oi-cost-price"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  {...form.register("costPrice", { valueAsNumber: true })}
+                />
+                {form.formState.errors.costPrice && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.costPrice.message}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="oi-price">Default sell price</Label>
@@ -309,6 +354,30 @@ export default function OutletItemsPage() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="eoi-type">Item type</Label>
+                <select
+                  id="eoi-type"
+                  className="flex h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  value={String(editForm.watch("itemType"))}
+                  onChange={(e) =>
+                    editForm.setValue("itemType", Number(e.target.value) as OutletItemType)
+                  }
+                >
+                  <option value={String(OutletItemType.Sale)}>Sale</option>
+                  <option value={String(OutletItemType.NonSale)}>Non-sale</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="eoi-cost-price">Cost price</Label>
+                <Input
+                  id="eoi-cost-price"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  {...editForm.register("costPrice", { valueAsNumber: true })}
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="eoi-price">Default sell price</Label>
                 <Input
                   id="eoi-price"
@@ -346,8 +415,10 @@ export default function OutletItemsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Unit</TableHead>
-                <TableHead className="text-right">Default price</TableHead>
+                <TableHead className="text-right">Cost price</TableHead>
+                <TableHead className="text-right">Sales price</TableHead>
                 <TableHead className="whitespace-nowrap">Added</TableHead>
                 {canManage ? (
                   <TableHead className="min-w-[148px] text-right">Actions</TableHead>
@@ -358,7 +429,7 @@ export default function OutletItemsPage() {
               {items.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={canManage ? 5 : 4}
+                    colSpan={canManage ? 7 : 6}
                     className="text-muted-foreground"
                   >
                     No outlet items yet.
@@ -368,8 +439,14 @@ export default function OutletItemsPage() {
                 items.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell className="font-medium">{row.name}</TableCell>
+                    <TableCell className="text-sm">
+                      {row.itemType === OutletItemType.Sale ? "Sale" : "Non-sale"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {row.unit?.trim() ? row.unit : "—"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatMoney(row.costPrice)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatMoney(row.defaultSellPrice)}

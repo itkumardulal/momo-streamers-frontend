@@ -167,7 +167,13 @@ const HEADER_TITLE_PREFIXES: { prefix: string; title: string }[] = [
   })),
 ].sort((a, b) => b.prefix.length - a.prefix.length);
 
-function headerTitleForPath(pathname: string): string {
+function headerTitleForPath(pathname: string, roleNorm?: string): string {
+  if (
+    (pathname === "/outlet-sales" || pathname.startsWith("/outlet-sales/")) &&
+    roleNorm === "WarehouseUser"
+  ) {
+    return "Warehouse POS";
+  }
   for (const { prefix, title } of HEADER_TITLE_PREFIXES) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
       return title;
@@ -206,6 +212,7 @@ const WAREHOUSE_USER_NAV: NavKey[] = [
   "menuItems",
   "warehouseProduction",
   "warehouseTransfers",
+  "outletPos",
   "outletStockRemovals",
   "reports",
 ];
@@ -316,12 +323,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const roleNorm = normalizeAuthRole(auth.role);
   const sidebarNav = useMemo(
-    () => navKeysForRole(roleNorm).map((key) => NAV_META[key]),
+    () =>
+      navKeysForRole(roleNorm).map((key) => {
+        const meta = NAV_META[key];
+        if (key === "outletPos" && roleNorm === "WarehouseUser") {
+          return { ...meta, label: "Warehouse POS" };
+        }
+        return meta;
+      }),
     [roleNorm],
   );
   const roleLine = roleNorm || auth.role || "—";
   const authEmail = auth.email ?? "";
-  const pageTitle = headerTitleForPath(pathname);
+  const pageTitle = headerTitleForPath(pathname, roleNorm);
 
   useEffect(() => {
     setMobileNavOpen(false);

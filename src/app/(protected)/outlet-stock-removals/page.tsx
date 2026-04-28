@@ -426,7 +426,7 @@ export default function OutletStockRemovalsPage() {
                           <Button
                             type="button"
                             size="sm"
-                            variant="secondary"
+                            variant="default"
                             disabled={!canPost}
                             onClick={() => addFromStock(r)}
                           >

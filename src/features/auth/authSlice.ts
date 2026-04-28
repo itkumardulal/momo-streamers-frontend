@@ -216,6 +216,13 @@ export const selectCanUseOutletPurchasePage = (s: { auth: AuthState }) =>
 export const selectCanUseOutletPos = (s: { auth: AuthState }) =>
   selectIsSuperAdmin(s) || selectIsOutletUser(s);
 
+/** Warehouse-counter menu POS (API: WarehouseUser). */
+export const selectCanUseWarehousePos = (s: { auth: AuthState }) =>
+  selectIsWarehouseUser(s);
+
+export const selectCanUseAnyPos = (s: { auth: AuthState }) =>
+  selectCanUseOutletPos(s) || selectCanUseWarehousePos(s);
+
 /** View outlet stock removals list/detail (API: SuperAdmin, OutletUser, or WarehouseUser). */
 export const selectCanViewOutletStockRemovals = (s: { auth: AuthState }) =>
   selectIsSuperAdmin(s) || selectIsOutletUser(s) || selectIsWarehouseUser(s);

@@ -263,6 +263,35 @@ export function DashboardView() {
     }));
   }, [financial?.days]);
 
+  const financialExpenseData = useMemo(() => {
+    if (!financial?.days?.length) return [];
+    return financial.days.map((d) => ({
+      date: d.date,
+      warehouseExpense: Math.round(d.warehousePurchaseExpense * 100) / 100,
+      outletExpense: Math.round(d.outletPurchaseExpense * 100) / 100,
+      totalExpense: Math.round(d.totalPurchaseExpense * 100) / 100,
+    }));
+  }, [financial?.days]);
+
+  const financialExpenseTotals = useMemo(() => {
+    if (!financial?.days?.length) {
+      return { warehouse: 0, outlet: 0, total: 0 };
+    }
+    let warehouse = 0;
+    let outlet = 0;
+    let total = 0;
+    for (const d of financial.days) {
+      warehouse += d.warehousePurchaseExpense;
+      outlet += d.outletPurchaseExpense;
+      total += d.totalPurchaseExpense;
+    }
+    return {
+      warehouse: Math.round(warehouse * 100) / 100,
+      outlet: Math.round(outlet * 100) / 100,
+      total: Math.round(total * 100) / 100,
+    };
+  }, [financial?.days]);
+
   const sellableOutletId = useMemo(() => {
     if (userOutletId) return userOutletId;
     if ((isSuperAdmin || isWarehouseUser) && salesOutletFilter) return salesOutletFilter;
@@ -422,10 +451,16 @@ export function DashboardView() {
   const byOutlet = useMemo(() => {
     const map = new Map<string, { name: string; total: number }>();
     for (const s of sales) {
-      const cur = map.get(s.outletId) ?? { name: s.outletName, total: 0 };
+      const key = s.isWarehouseDirectSale
+        ? `wh:${s.warehouseId ?? "direct"}`
+        : `out:${s.outletId ?? ""}`;
+      const label = s.isWarehouseDirectSale
+        ? (s.warehouseName?.trim() || "Warehouse (direct)")
+        : s.outletName;
+      const cur = map.get(key) ?? { name: label, total: 0 };
       cur.total += s.grandTotal;
-      cur.name = s.outletName || cur.name;
-      map.set(s.outletId, cur);
+      cur.name = label || cur.name;
+      map.set(key, cur);
     }
     return [...map.values()]
       .map((o) => ({
@@ -665,7 +700,7 @@ export function DashboardView() {
                 <CardTitle className="text-base">Daily breakdown (UTC)</CardTitle>
                 <CardDescription>
                   Sales = receipt grand total; collection = cash + bank; est. net profit = sales −
-                  est. COGS (menu lines only).
+                  est. COGS. Purchase expenses shown separately.
                 </CardDescription>
               </CardHeader>
               <CardContent className="max-h-80 overflow-auto">
@@ -676,6 +711,9 @@ export function DashboardView() {
                       <TableHead className="text-right">Sales</TableHead>
                       <TableHead className="text-right">Est. net profit</TableHead>
                       <TableHead className="text-right">Collection</TableHead>
+                      <TableHead className="text-right">Warehouse purchase</TableHead>
+                      <TableHead className="text-right">Outlet purchase</TableHead>
+                      <TableHead className="text-right">Total purchase expense</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -691,12 +729,39 @@ export function DashboardView() {
                         <TableCell className="text-right tabular-nums">
                           {formatMoney(d.collectionTotal)}
                         </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatMoney(d.warehousePurchaseExpense)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatMoney(d.outletPurchaseExpense)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatMoney(d.totalPurchaseExpense)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <KpiCard
+                title="Warehouse purchase expense"
+                value={formatMoney(financialExpenseTotals.warehouse)}
+                loading={false}
+              />
+              <KpiCard
+                title="Outlet purchase expense"
+                value={formatMoney(financialExpenseTotals.outlet)}
+                loading={false}
+              />
+              <KpiCard
+                title="Total purchase expense"
+                value={formatMoney(financialExpenseTotals.total)}
+                loading={false}
+              />
+            </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
               <Card className="border-border shadow-sm">
@@ -809,7 +874,9 @@ export function DashboardView() {
             <Card className="border-border shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base">Daily est. net profit vs collection</CardTitle>
-                <CardDescription>Estimated profit uses current menu costs (see note above).</CardDescription>
+                <CardDescription>
+                  Estimated profit uses current menu costs and does not deduct purchase expenses.
+                </CardDescription>
               </CardHeader>
               <CardContent className="min-h-[220px] h-72">
                 {financialProfitCollectionData.length === 0 ? (
@@ -838,6 +905,57 @@ export function DashboardView() {
                         dataKey="collection"
                         name="Collection"
                         stroke={FIN_LINE_COLORS[1]}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base">Daily purchase expenses</CardTitle>
+                <CardDescription>
+                  Warehouse purchases + outlet purchases by UTC day.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="min-h-[220px] h-72">
+                {financialExpenseData.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No purchase expenses in range.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart
+                      data={financialExpenseData}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 11 }} width={44} />
+                      <Tooltip formatter={(v) => formatMoney(Number(v))} />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="warehouseExpense"
+                        name="Warehouse purchase"
+                        stroke={FIN_LINE_COLORS[2]}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="outletExpense"
+                        name="Outlet purchase"
+                        stroke={FIN_LINE_COLORS[3]}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="totalExpense"
+                        name="Total purchase expense"
+                        stroke={FIN_LINE_COLORS[0]}
                         strokeWidth={2}
                         dot={false}
                       />
@@ -1363,7 +1481,7 @@ export function DashboardView() {
             <TableHeader>
               <TableRow>
                 <TableHead>Receipt</TableHead>
-                <TableHead>Outlet</TableHead>
+                <TableHead>Outlet / warehouse</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Cash</TableHead>
                 <TableHead className="text-right">Bank</TableHead>
@@ -1380,7 +1498,11 @@ export function DashboardView() {
                 recentSales.map((s: OutletSaleListItem) => (
                   <TableRow key={s.id}>
                     <TableCell className="font-mono text-xs">{s.receiptNo}</TableCell>
-                    <TableCell>{s.outletName}</TableCell>
+                    <TableCell>
+                      {s.isWarehouseDirectSale
+                        ? (s.warehouseName?.trim() || "Warehouse (direct)")
+                        : s.outletName}
+                    </TableCell>
                     <TableCell className="text-right">{formatMoney(s.grandTotal)}</TableCell>
                     <TableCell className="text-right">{formatMoney(s.cashPaidAmount)}</TableCell>
                     <TableCell className="text-right">{formatMoney(s.bankPaidAmount)}</TableCell>

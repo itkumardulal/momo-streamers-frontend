@@ -15,15 +15,17 @@ import {
 } from "@/components/ui/table";
 import {
   useCreateOutletSaleMutation,
+  useGetOutletItemsQuery,
   useGetOutletSalesQuery,
   useGetOutletSellableStockQuery,
   useGetOutletsQuery,
 } from "@/features/api/apiSlice";
-import { OutletStockSource } from "@/entities/types";
+import { OutletItemType, OutletStockSource } from "@/entities/types";
 import {
   selectAuthOutletId,
-  selectCanUseOutletPos,
+  selectCanUseAnyPos,
   selectIsSuperAdmin,
+  selectIsWarehouseUser,
 } from "@/features/auth/authSlice";
 import { useAppSelector } from "@/store/hooks";
 import { cn } from "@/lib/utils";
@@ -78,8 +80,9 @@ type CartLine =
     };
 
 export default function OutletSalesPage() {
-  const canUse = useAppSelector(selectCanUseOutletPos);
+  const canUse = useAppSelector(selectCanUseAnyPos);
   const isSuperAdmin = useAppSelector(selectIsSuperAdmin);
+  const isWarehouseUser = useAppSelector(selectIsWarehouseUser);
   const userOutletId = useAppSelector(selectAuthOutletId);
 
   const { data: outletsRes } = useGetOutletsQuery();
@@ -90,16 +93,26 @@ export default function OutletSalesPage() {
     ? posOutletId || ""
     : userOutletId ?? "";
 
+  const hasPosContext = isWarehouseUser || !!effectiveOutletId;
+
   const { data: stockRes, isFetching: stockLoading, refetch: refetchStock } =
     useGetOutletSellableStockQuery(
-      effectiveOutletId ? effectiveOutletId : undefined,
-      { skip: !canUse || !effectiveOutletId },
+      isWarehouseUser
+        ? undefined
+        : effectiveOutletId
+          ? effectiveOutletId
+          : undefined,
+      { skip: !canUse || (!isWarehouseUser && !effectiveOutletId) },
     );
 
-  const listArg = effectiveOutletId ? { outletId: effectiveOutletId } : undefined;
+  const listArg = isWarehouseUser
+    ? undefined
+    : effectiveOutletId
+      ? { outletId: effectiveOutletId }
+      : undefined;
   const { data: salesRes, isLoading: salesLoading } = useGetOutletSalesQuery(
     listArg,
-    { skip: !canUse || !effectiveOutletId },
+    { skip: !canUse || (!isWarehouseUser && !effectiveOutletId) },
   );
 
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -108,8 +121,23 @@ export default function OutletSalesPage() {
   const [bankPaidStr, setBankPaidStr] = useState("0");
   const [notes, setNotes] = useState("");
   const [createSale, { isLoading: submitting }] = useCreateOutletSaleMutation();
+  const { data: outletItemsRes } = useGetOutletItemsQuery(undefined, {
+    skip: !canUse,
+  });
+  const outletItemById = useMemo(
+    () => new Map((outletItemsRes?.success ? outletItemsRes.data ?? [] : []).map((x) => [x.id, x])),
+    [outletItemsRes],
+  );
 
-  const stockRows = stockRes?.success ? stockRes.data ?? [] : [];
+  const stockRows = useMemo(() => {
+    const all = stockRes?.success ? stockRes.data ?? [] : [];
+    return all.filter((r) => {
+      if (r.source !== OutletStockSource.Direct) return true;
+      if (!r.outletItemId) return false;
+      const item = outletItemById.get(r.outletItemId);
+      return item?.itemType === OutletItemType.Sale;
+    });
+  }, [stockRes, outletItemById]);
 
   const cartTotal = useMemo(() => {
     let t = 0;
@@ -294,7 +322,7 @@ export default function OutletSalesPage() {
   const anyOverStock = cart.some((c) => c.qty > c.maxQty + 1e-9);
 
   const onCheckout = async () => {
-    if (!effectiveOutletId) {
+    if (!isWarehouseUser && !effectiveOutletId) {
       toast.error("Select an outlet");
       return;
     }
@@ -351,8 +379,8 @@ export default function OutletSalesPage() {
         cashPaidAmount: cashPaidResult.amount,
         bankPaidAmount: bankPaidResult.amount,
         menuLines,
-        directLines,
-        ...(isSuperAdmin ? { outletId: effectiveOutletId } : {}),
+        directLines: isWarehouseUser ? [] : directLines,
+        ...(isSuperAdmin && !isWarehouseUser ? { outletId: effectiveOutletId } : {}),
       }).unwrap();
       if (res.success && res.data) {
         toast.success(
@@ -375,13 +403,20 @@ export default function OutletSalesPage() {
   if (!canUse) {
     return (
       <div className="space-y-2">
-        <h2 className="text-xl font-semibold text-foreground">Outlet POS</h2>
+        <h2 className="text-xl font-semibold text-foreground">POS</h2>
         <p className="text-sm text-muted-foreground">
-          You do not have access to outlet sales.
+          You do not have access to sales.
         </p>
       </div>
     );
   }
+
+  const showLocationCol = isSuperAdmin || isWarehouseUser;
+  const tableColCount = showLocationCol ? 7 : 6;
+  const saleRowLocation = (s: (typeof salesRows)[number]) =>
+    s.isWarehouseDirectSale
+      ? (s.warehouseName?.trim() || "Warehouse")
+      : s.outletName;
 
   const selectClass = cn(
     "flex h-9 w-full max-w-xs rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none",
@@ -393,16 +428,17 @@ export default function OutletSalesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold text-foreground">Outlet POS</h2>
+        <h2 className="text-xl font-semibold text-foreground">
+          {isWarehouseUser ? "Warehouse POS" : "Outlet POS"}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          Sell menu stock (from warehouse transfers) and direct retail items.
-          Quantities cannot exceed on-hand; the server re-checks on submit. One
-          sale can combine cash and bank in a single payment—split the amounts
-          below to match what the customer paid.
+          {isWarehouseUser
+            ? "Sell menu items from warehouse stock. Direct retail lines are not available at the warehouse counter. Quantities cannot exceed on-hand; the server re-checks on submit. Split cash and bank below to match what the customer paid."
+            : "Sell menu stock (from warehouse transfers) and direct retail items. Quantities cannot exceed on-hand; the server re-checks on submit. One sale can combine cash and bank in a single payment—split the amounts below to match what the customer paid."}
         </p>
       </div>
 
-      {isSuperAdmin && (
+      {isSuperAdmin && !isWarehouseUser && (
         <div className="space-y-2">
           <Label>Outlet for this session</Label>
           <select
@@ -424,7 +460,7 @@ export default function OutletSalesPage() {
         </div>
       )}
 
-      {!effectiveOutletId ? (
+      {!hasPosContext ? (
         <p className="text-sm text-muted-foreground">
           {isSuperAdmin
             ? "Choose an outlet to load sellable stock."
@@ -473,7 +509,7 @@ export default function OutletSalesPage() {
                           <Button
                             type="button"
                             size="sm"
-                            variant="secondary"
+                            variant="default"
                             onClick={() => addFromStock(r)}
                           >
                             Add
@@ -738,7 +774,7 @@ export default function OutletSalesPage() {
         </div>
       )}
 
-      {effectiveOutletId ? (
+      {hasPosContext ? (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-foreground">Recent sales</h3>
           {salesLoading && (
@@ -751,7 +787,11 @@ export default function OutletSalesPage() {
                   <TableRow>
                     <TableHead>Receipt</TableHead>
                     <TableHead>When</TableHead>
-                    {isSuperAdmin ? <TableHead>Outlet</TableHead> : null}
+                    {showLocationCol ? (
+                      <TableHead>
+                        {isWarehouseUser ? "Warehouse" : "Outlet / location"}
+                      </TableHead>
+                    ) : null}
                     <TableHead className="text-right">Other ch.</TableHead>
                     <TableHead className="text-right">Cash</TableHead>
                     <TableHead className="text-right">Bank</TableHead>
@@ -762,10 +802,12 @@ export default function OutletSalesPage() {
                   {salesRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={isSuperAdmin ? 7 : 6}
+                        colSpan={tableColCount}
                         className="text-muted-foreground"
                       >
-                        No sales yet for this outlet.
+                        {isWarehouseUser
+                          ? "No warehouse POS sales in this list yet."
+                          : "No sales yet for this outlet."}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -777,8 +819,10 @@ export default function OutletSalesPage() {
                         <TableCell className="whitespace-nowrap text-sm">
                           {formatDateTime(s.saleAtUtc)}
                         </TableCell>
-                        {isSuperAdmin ? (
-                          <TableCell className="text-sm">{s.outletName}</TableCell>
+                        {showLocationCol ? (
+                          <TableCell className="text-sm">
+                            {saleRowLocation(s)}
+                          </TableCell>
                         ) : null}
                         <TableCell className="text-right tabular-nums">
                           {formatAmount(s.otherChargeAmount ?? 0)}
