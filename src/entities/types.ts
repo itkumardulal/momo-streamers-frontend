@@ -980,6 +980,7 @@ export interface OutletDailySheetExpenseRow {
 
 export interface OutletDailySheetSummary {
   totalSalesValue: number;
+  otherChargeIncome: number;
   saleableCogs: number;
   grossProfit: number;
   otherPurchaseCost: number;

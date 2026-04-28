@@ -400,6 +400,7 @@ export function printOutletDailySheetReport(r: OutletDailySheetReport) {
     <table style="margin-top:0.35rem;max-width:28rem;">
       <tbody>
         <tr><th scope="row" style="text-align:left;">Total sales (receipts)</th><td class="num">${escapeHtml(formatMoney(s.totalSalesValue))}</td></tr>
+        <tr><th scope="row" style="text-align:left;">Other charge income</th><td class="num">${escapeHtml(formatMoney(s.otherChargeIncome))}</td></tr>
         <tr><th scope="row" style="text-align:left;">Saleable COGS</th><td class="num">${escapeHtml(formatMoney(s.saleableCogs))}</td></tr>
         <tr><th scope="row" style="text-align:left;">Gross profit</th><td class="num">${escapeHtml(formatMoney(s.grossProfit))}</td></tr>
         <tr><th scope="row" style="text-align:left;">Other purchase cost</th><td class="num">${escapeHtml(formatMoney(s.otherPurchaseCost))}</td></tr>

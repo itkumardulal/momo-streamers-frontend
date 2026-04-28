@@ -186,7 +186,6 @@ function headerTitleForPath(pathname: string, roleNorm?: string): string {
 const SUPER_ADMIN_NAV: NavKey[] = [
   "dashboard",
   "warehouses",
-  "outlets",
   "users",
   "rawMaterials",
   "suppliers",
@@ -196,12 +195,13 @@ const SUPER_ADMIN_NAV: NavKey[] = [
   "menuItems",
   "warehouseProduction",
   "warehouseTransfers",
+  "expenseItems",
+  "expenseEntries",
+  "outlets",
   "outletItems",
   "outletPurchases",
   "outletPos",
   "outletStockRemovals",
-  "expenseItems",
-  "expenseEntries",
   "reports",
 ];
 

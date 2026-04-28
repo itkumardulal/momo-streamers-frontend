@@ -525,6 +525,12 @@ export default function OutletDailySheetPage() {
                     </TableCell>
                   </TableRow>
                   <TableRow>
+                    <TableCell className="font-medium">Other charge income</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatMoney(report.summary.otherChargeIncome)}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
                     <TableCell className="font-medium">Saleable COGS</TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatMoney(report.summary.saleableCogs)}
