@@ -1,13 +1,22 @@
-import type {
-  MonthlyBusinessSheet,
-  OutletDailyStockReport,
-  OutletDailySheetReport,
-  PerOutletPerformanceReport,
-  RawMaterialPurchaseDetail,
-  WarehouseDailyStockReport,
-  WarehouseProductionDetail,
-  WarehouseTransferDetail,
+import {
+  AssetStatus,
+  type AssetMaintenanceReport,
+  type AssetReport,
+  type MonthlyBusinessSheet,
+  type OutletDailyStockReport,
+  type OutletDailySheetReport,
+  type PerOutletPerformanceReport,
+  type RawMaterialPurchaseDetail,
+  type WarehouseDailyStockReport,
+  type WarehouseProductionDetail,
+  type WarehouseTransferDetail,
 } from "@/entities/types";
+
+const ASSET_STATUS_LABEL: Record<AssetStatus, string> = {
+  [AssetStatus.Active]: "Active",
+  [AssetStatus.Inactive]: "Inactive",
+  [AssetStatus.Disposed]: "Disposed",
+};
 
 function escapeHtml(s: string) {
   return s
@@ -592,4 +601,90 @@ export function printPerOutletPerformance(d: PerOutletPerformanceReport): boolea
     inner,
     { bodyMaxWidth: "100%" },
   );
+}
+
+export function printAssetsReport(r: AssetReport) {
+  const rows = r.rows
+    .map((row) => {
+      const loc = row.outletName || row.warehouseName || "—";
+      const status =
+        ASSET_STATUS_LABEL[row.status as AssetStatus] ?? String(row.status);
+      return `<tr>
+        <td>${escapeHtml(row.name)}</td>
+        <td>${escapeHtml(row.categoryName)}</td>
+        <td>${escapeHtml(status)}</td>
+        <td>${escapeHtml(formatPurchaseDateOnly(row.purchaseDate))}</td>
+        <td class="num">${formatMoney(row.purchaseCost)}</td>
+        <td>${escapeHtml(row.warrantyExpiry ? formatPurchaseDateOnly(row.warrantyExpiry) : "—")}</td>
+        <td>${escapeHtml(loc)}</td>
+        <td>${escapeHtml(row.remarks?.trim() || "—")}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const inner = `
+    <h1>Assets report</h1>
+    <div class="meta">
+      <div><strong>Total assets</strong> ${r.totalCount}</div>
+      <div><strong>Total purchase cost</strong> ${formatMoney(r.totalPurchaseCost)}</div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Name</th>
+        <th>Category</th>
+        <th>Status</th>
+        <th>Purchase date</th>
+        <th class="num">Purchase cost</th>
+        <th>Warranty</th>
+        <th>Location</th>
+        <th>Remarks</th>
+      </tr></thead>
+      <tbody>${rows || `<tr><td colspan="8">No assets match the filters.</td></tr>`}</tbody>
+    </table>
+  `;
+  return openPrintDocument("Assets report", inner, { bodyMaxWidth: "64rem" });
+}
+
+export function printAssetMaintenanceReport(r: AssetMaintenanceReport) {
+  const rows = r.rows
+    .map((row) => {
+      const loc = row.outletName || row.warehouseName || "—";
+      return `<tr>
+        <td>${escapeHtml(formatPurchaseDateOnly(row.maintenanceDate))}</td>
+        <td>${escapeHtml(row.assetName)}</td>
+        <td>${escapeHtml(row.categoryName || "—")}</td>
+        <td class="num">${formatMoney(row.cost)}</td>
+        <td>${row.recordAsExpense ? "Yes" : "No"}</td>
+        <td>${escapeHtml(row.expenseItemName || "—")}</td>
+        <td>${escapeHtml(loc)}</td>
+        <td>${escapeHtml(row.description?.trim() || "—")}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const inner = `
+    <h1>Asset maintenance report</h1>
+    <div class="meta">
+      <div><strong>Range</strong> ${escapeHtml(r.fromDate)} — ${escapeHtml(r.toDate)}</div>
+      <div><strong>Records</strong> ${r.totalCount}</div>
+      <div><strong>Total cost</strong> ${formatMoney(r.totalCost)}</div>
+      <div><strong>Recorded as expense</strong> ${r.expenseCount} (${formatMoney(r.expenseCostTotal)})</div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Date</th>
+        <th>Asset</th>
+        <th>Category</th>
+        <th class="num">Cost</th>
+        <th>Expense</th>
+        <th>Expense item</th>
+        <th>Location</th>
+        <th>Description</th>
+      </tr></thead>
+      <tbody>${rows || `<tr><td colspan="8">No maintenance records in this range.</td></tr>`}</tbody>
+    </table>
+  `;
+  return openPrintDocument("Asset maintenance report", inner, {
+    bodyMaxWidth: "64rem",
+  });
 }

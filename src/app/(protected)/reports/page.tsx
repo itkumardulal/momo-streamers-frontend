@@ -21,8 +21,12 @@ export default function ReportsPage() {
     roleNorm === "SuperAdmin" || roleNorm === "WarehouseUser";
   const canViewOutletDailyStock = useAppSelector(selectCanViewOutletStockRemovals);
   const canViewMonthlySheet = useAppSelector(selectCanViewMonthlyBusinessSheet);
+  const canViewAssetReports = roleNorm === "SuperAdmin";
   const canViewReportsHub =
-    canViewWarehouseStock || roleNorm === "OutletUser" || canViewMonthlySheet;
+    canViewWarehouseStock ||
+    roleNorm === "OutletUser" ||
+    canViewMonthlySheet ||
+    canViewAssetReports;
 
   if (!canViewReportsHub) {
     return (
@@ -36,7 +40,10 @@ export default function ReportsPage() {
   }
 
   const hasAnyReportCard =
-    canViewWarehouseStock || canViewOutletDailyStock || canViewMonthlySheet;
+    canViewWarehouseStock ||
+    canViewOutletDailyStock ||
+    canViewMonthlySheet ||
+    canViewAssetReports;
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -136,6 +143,43 @@ export default function ReportsPage() {
                     Compare outlets by date range: daily, ISO week, month, or
                     year buckets; range summary and net profit matrix (same data
                     rules as monthly business sheet).
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          ) : null}
+          {canViewAssetReports ? (
+            <Link href="/reports/assets-report" className="block h-full">
+              <Card className="h-full cursor-pointer transition-shadow hover:shadow-md">
+                <CardHeader>
+                  <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <FileSpreadsheet className="size-5" />
+                  </div>
+                  <CardTitle className="text-base">Assets report</CardTitle>
+                  <CardDescription>
+                    Filter assets by category, status, and location; purchase
+                    cost totals and printable inventory list.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          ) : null}
+          {canViewAssetReports ? (
+            <Link
+              href="/reports/asset-maintenance-report"
+              className="block h-full"
+            >
+              <Card className="h-full cursor-pointer transition-shadow hover:shadow-md">
+                <CardHeader>
+                  <div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <FileSpreadsheet className="size-5" />
+                  </div>
+                  <CardTitle className="text-base">
+                    Asset maintenance report
+                  </CardTitle>
+                  <CardDescription>
+                    Maintenance history by date range, asset, or category; cost
+                    and expense totals with print.
                   </CardDescription>
                 </CardHeader>
               </Card>

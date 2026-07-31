@@ -1,8 +1,14 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type {
   ApiResponse,
+  Asset,
+  AssetCategory,
+  AssetMaintenance,
   CatalogItem,
   CompletePasswordSetupRequest,
+  CreateAssetCategoryRequest,
+  CreateAssetMaintenanceRequest,
+  CreateAssetRequest,
   CreateCatalogItemRequest,
   CreateExpenseItemRequest,
   CreateMenuCategoryRequest,
@@ -25,6 +31,9 @@ import type {
   RawMaterialItem,
   ResetPasswordWithOtpRequest,
   Supplier,
+  UpdateAssetCategoryRequest,
+  UpdateAssetMaintenanceRequest,
+  UpdateAssetRequest,
   UpdateCatalogItemRequest,
   UpdateExpenseItemRequest,
   UpdateMenuCategoryRequest,
@@ -68,6 +77,9 @@ import type {
   PerOutletPerformanceGranularity,
   DashboardStockSummary,
   DashboardFinancialSummary,
+  AssetReport,
+  AssetMaintenanceReport,
+  AssetStatus,
 } from "@/entities/types";
 import type { AuthState } from "@/features/auth/authSlice";
 
@@ -98,6 +110,9 @@ export const apiSlice = createApi({
     "RawMaterialItem",
     "ExpenseItem",
     "ExpenseEntry",
+    "AssetCategory",
+    "Asset",
+    "AssetMaintenance",
     "Supplier",
     "WarehouseTransfer",
     "WarehouseProduction",
@@ -392,6 +407,115 @@ export const apiSlice = createApi({
     deleteExpenseEntry: builder.mutation<ApiResponse<null>, string>({
       query: (id) => ({ url: `/api/expense-entries/${id}`, method: "DELETE" }),
       invalidatesTags: ["ExpenseEntry"],
+    }),
+    getAssetCategories: builder.query<ApiResponse<AssetCategory[]>, void>({
+      query: () => "/api/asset-categories",
+      providesTags: ["AssetCategory"],
+    }),
+    createAssetCategory: builder.mutation<
+      ApiResponse<AssetCategory>,
+      CreateAssetCategoryRequest
+    >({
+      query: (body) => ({
+        url: "/api/asset-categories",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["AssetCategory"],
+    }),
+    updateAssetCategory: builder.mutation<
+      ApiResponse<AssetCategory>,
+      { id: string; body: UpdateAssetCategoryRequest }
+    >({
+      query: ({ id, body }) => ({
+        url: `/api/asset-categories/${id}`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["AssetCategory", "Asset"],
+    }),
+    deleteAssetCategory: builder.mutation<ApiResponse<null>, string>({
+      query: (id) => ({
+        url: `/api/asset-categories/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["AssetCategory", "Asset"],
+    }),
+    getAssets: builder.query<
+      ApiResponse<Asset[]>,
+      { categoryId?: string } | void
+    >({
+      query: (args) => ({
+        url: "/api/assets",
+        ...(args?.categoryId ? { params: { categoryId: args.categoryId } } : {}),
+      }),
+      providesTags: ["Asset"],
+    }),
+    createAsset: builder.mutation<ApiResponse<Asset>, CreateAssetRequest>({
+      query: (body) => ({
+        url: "/api/assets",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Asset"],
+    }),
+    updateAsset: builder.mutation<
+      ApiResponse<Asset>,
+      { id: string; body: UpdateAssetRequest }
+    >({
+      query: ({ id, body }) => ({
+        url: `/api/assets/${id}`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["Asset", "AssetMaintenance"],
+    }),
+    deleteAsset: builder.mutation<ApiResponse<null>, string>({
+      query: (id) => ({ url: `/api/assets/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Asset", "AssetMaintenance"],
+    }),
+    getAssetMaintenances: builder.query<
+      ApiResponse<AssetMaintenance[]>,
+      { fromDate?: string; toDate?: string; assetId?: string } | void
+    >({
+      query: (args) => ({
+        url: "/api/asset-maintenances",
+        params: {
+          ...(args?.fromDate ? { fromDate: args.fromDate } : {}),
+          ...(args?.toDate ? { toDate: args.toDate } : {}),
+          ...(args?.assetId ? { assetId: args.assetId } : {}),
+        },
+      }),
+      providesTags: ["AssetMaintenance"],
+    }),
+    createAssetMaintenance: builder.mutation<
+      ApiResponse<AssetMaintenance>,
+      CreateAssetMaintenanceRequest
+    >({
+      query: (body) => ({
+        url: "/api/asset-maintenances",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["AssetMaintenance", "ExpenseEntry"],
+    }),
+    updateAssetMaintenance: builder.mutation<
+      ApiResponse<AssetMaintenance>,
+      { id: string; body: UpdateAssetMaintenanceRequest }
+    >({
+      query: ({ id, body }) => ({
+        url: `/api/asset-maintenances/${id}`,
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["AssetMaintenance", "ExpenseEntry"],
+    }),
+    deleteAssetMaintenance: builder.mutation<ApiResponse<null>, string>({
+      query: (id) => ({
+        url: `/api/asset-maintenances/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["AssetMaintenance", "ExpenseEntry"],
     }),
     getSuppliers: builder.query<ApiResponse<Supplier[]>, string | undefined>({
       query: (forPurchaseContext) => ({
@@ -708,6 +832,44 @@ export const apiSlice = createApi({
         },
       }),
     }),
+    getAssetsReport: builder.query<
+      ApiResponse<AssetReport>,
+      {
+        categoryId?: string;
+        status?: AssetStatus;
+        outletId?: string;
+        warehouseId?: string;
+      }
+    >({
+      query: (args) => ({
+        url: "/api/reports/assets",
+        params: {
+          ...(args.categoryId ? { categoryId: args.categoryId } : {}),
+          ...(args.status !== undefined ? { status: args.status } : {}),
+          ...(args.outletId ? { outletId: args.outletId } : {}),
+          ...(args.warehouseId ? { warehouseId: args.warehouseId } : {}),
+        },
+      }),
+    }),
+    getAssetMaintenancesReport: builder.query<
+      ApiResponse<AssetMaintenanceReport>,
+      {
+        fromDate: string;
+        toDate: string;
+        assetId?: string;
+        categoryId?: string;
+      }
+    >({
+      query: ({ fromDate, toDate, assetId, categoryId }) => ({
+        url: "/api/reports/asset-maintenances",
+        params: {
+          fromDate,
+          toDate,
+          ...(assetId ? { assetId } : {}),
+          ...(categoryId ? { categoryId } : {}),
+        },
+      }),
+    }),
     getOutletDailyStockReport: builder.query<
       ApiResponse<OutletDailyStockReport>,
       { outletId: string; fromDate: string; toDate: string }
@@ -830,6 +992,18 @@ export const {
   useCreateExpenseEntryMutation,
   useUpdateExpenseEntryMutation,
   useDeleteExpenseEntryMutation,
+  useGetAssetCategoriesQuery,
+  useCreateAssetCategoryMutation,
+  useUpdateAssetCategoryMutation,
+  useDeleteAssetCategoryMutation,
+  useGetAssetsQuery,
+  useCreateAssetMutation,
+  useUpdateAssetMutation,
+  useDeleteAssetMutation,
+  useGetAssetMaintenancesQuery,
+  useCreateAssetMaintenanceMutation,
+  useUpdateAssetMaintenanceMutation,
+  useDeleteAssetMaintenanceMutation,
   useGetSuppliersQuery,
   useCreateSupplierMutation,
   useUpdateSupplierMutation,
@@ -869,6 +1043,8 @@ export const {
   useLazyGetOutletStockRemovalByIdQuery,
   useCreateOutletStockRemovalMutation,
   useLazyGetWarehouseDailyStockReportQuery,
+  useLazyGetAssetsReportQuery,
+  useLazyGetAssetMaintenancesReportQuery,
   useLazyGetOutletDailyStockReportQuery,
   useLazyGetOutletDailySheetReportQuery,
   useGetDashboardStockSummaryQuery,
