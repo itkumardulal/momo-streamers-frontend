@@ -297,6 +297,176 @@ export interface UpdateExpenseEntryRequest {
   notes?: string | null;
 }
 
+/** Matches backend AssetStatus (integer). */
+export enum AssetStatus {
+  Active = 0,
+  Inactive = 1,
+  Disposed = 2,
+}
+
+export const ASSET_STATUS_OPTIONS: { value: AssetStatus; label: string }[] = [
+  { value: AssetStatus.Active, label: "Active" },
+  { value: AssetStatus.Inactive, label: "Inactive" },
+  { value: AssetStatus.Disposed, label: "Disposed" },
+];
+
+export interface AssetCategory {
+  id: string;
+  name: string;
+  description?: string | null;
+  createdAt: string;
+}
+
+export interface CreateAssetCategoryRequest {
+  name: string;
+  description?: string | null;
+}
+
+export interface UpdateAssetCategoryRequest {
+  name: string;
+  description?: string | null;
+}
+
+export interface Asset {
+  id: string;
+  categoryId: string;
+  categoryName: string;
+  name: string;
+  purchaseDate: string;
+  purchaseCost: number;
+  warrantyExpiry?: string | null;
+  status: AssetStatus;
+  remarks?: string | null;
+  outletId?: string | null;
+  outletName?: string | null;
+  warehouseId?: string | null;
+  warehouseName?: string | null;
+  createdAt: string;
+}
+
+export interface CreateAssetRequest {
+  categoryId: string;
+  name: string;
+  purchaseDate: string;
+  purchaseCost: number;
+  warrantyExpiry?: string | null;
+  status?: AssetStatus;
+  remarks?: string | null;
+  outletId?: string | null;
+  warehouseId?: string | null;
+}
+
+export interface UpdateAssetRequest {
+  categoryId: string;
+  name: string;
+  purchaseDate: string;
+  purchaseCost: number;
+  warrantyExpiry?: string | null;
+  status: AssetStatus;
+  remarks?: string | null;
+  outletId?: string | null;
+  warehouseId?: string | null;
+}
+
+export interface AssetMaintenance {
+  id: string;
+  assetId: string;
+  assetName: string;
+  maintenanceDate: string;
+  cost: number;
+  recordAsExpense: boolean;
+  expenseEntryId?: string | null;
+  expenseItemId?: string | null;
+  expenseItemName?: string | null;
+  outletId?: string | null;
+  outletName?: string | null;
+  warehouseId?: string | null;
+  warehouseName?: string | null;
+  description?: string | null;
+  remarks?: string | null;
+  createdAt: string;
+}
+
+export interface CreateAssetMaintenanceRequest {
+  assetId: string;
+  maintenanceDate: string;
+  cost: number;
+  recordAsExpense: boolean;
+  expenseItemId?: string | null;
+  outletId?: string | null;
+  warehouseId?: string | null;
+  description?: string | null;
+  remarks?: string | null;
+}
+
+export interface UpdateAssetMaintenanceRequest {
+  assetId: string;
+  maintenanceDate: string;
+  cost: number;
+  recordAsExpense: boolean;
+  expenseItemId?: string | null;
+  outletId?: string | null;
+  warehouseId?: string | null;
+  description?: string | null;
+  remarks?: string | null;
+}
+
+export interface AssetReportRow {
+  id: string;
+  name: string;
+  categoryId: string;
+  categoryName: string;
+  status: AssetStatus;
+  purchaseDate: string;
+  purchaseCost: number;
+  warrantyExpiry?: string | null;
+  outletId?: string | null;
+  outletName?: string | null;
+  warehouseId?: string | null;
+  warehouseName?: string | null;
+  remarks?: string | null;
+}
+
+export interface AssetReport {
+  categoryId?: string | null;
+  status?: AssetStatus | null;
+  outletId?: string | null;
+  warehouseId?: string | null;
+  totalCount: number;
+  totalPurchaseCost: number;
+  rows: AssetReportRow[];
+}
+
+export interface AssetMaintenanceReportRow {
+  id: string;
+  maintenanceDate: string;
+  assetId: string;
+  assetName: string;
+  categoryId: string;
+  categoryName: string;
+  cost: number;
+  description?: string | null;
+  remarks?: string | null;
+  recordAsExpense: boolean;
+  expenseItemName?: string | null;
+  outletId?: string | null;
+  outletName?: string | null;
+  warehouseId?: string | null;
+  warehouseName?: string | null;
+}
+
+export interface AssetMaintenanceReport {
+  fromDate: string;
+  toDate: string;
+  assetId?: string | null;
+  categoryId?: string | null;
+  totalCount: number;
+  totalCost: number;
+  expenseCount: number;
+  expenseCostTotal: number;
+  rows: AssetMaintenanceReportRow[];
+}
+
 export interface MonthlyBusinessSheetOutletDto {
   id: string;
   name: string;
